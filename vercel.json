@@ -1,8 +1,8 @@
 {
-  "buildCommand": "cd web && bun run build",
+  "buildCommand": "cd web && npm run build",
   "outputDirectory": "web/dist",
-  "installCommand": "bun install",
-  "devCommand": "cd web && bun run dev",
+  "installCommand": "npm install",
+  "devCommand": "cd web && npm run dev",
   "framework": "vite",
   "rewrites": [
     {
