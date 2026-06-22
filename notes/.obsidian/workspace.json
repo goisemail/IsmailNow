@@ -1,0 +1,240 @@
+{
+  "main": {
+    "id": "593b2eb162a53bc9",
+    "type": "split",
+    "children": [
+      {
+        "id": "737f94a8c552d874",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "78e1f1ad06c406d7",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "ui-ux-spec.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "ui-ux-spec"
+            }
+          },
+          {
+            "id": "86b5f464f4356a3b",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "ui_navigation.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "ui_navigation"
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "4983fc232d43285c",
+    "type": "split",
+    "children": [
+      {
+        "id": "b70c1312d46bf38b",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "ff8855a4fdce98ae",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": true
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "5ef9801340e7ce4a",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "68b3216fb5ff3ae8",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "b217a2aedb46fd93",
+    "type": "split",
+    "children": [
+      {
+        "id": "cd62d54e8cf3dc8f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "28b73f9026b6a06e",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "ui-ux-spec.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for ui-ux-spec"
+            }
+          },
+          {
+            "id": "64961c17becf0ff4",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "ui-ux-spec.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from ui-ux-spec"
+            }
+          },
+          {
+            "id": "d1c2f478cd4865f6",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "27f091871baff193",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "All properties"
+            }
+          },
+          {
+            "id": "4de5c409b50deddb",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "ui-ux-spec.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of ui-ux-spec"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "bases:Create new base": false
+    }
+  },
+  "active": "86b5f464f4356a3b",
+  "lastOpenFiles": [
+    "SMW Gaps.md",
+    "ui-ux-spec.md",
+    "db-migrations.md",
+    "accessibility-mapping.md",
+    "apk_crosswalk_diagram.md",
+    "apk_crosswalk.md",
+    "ui_navigation.md",
+    "db_schema.md",
+    "android_test_matrix.csv",
+    "ui_test_harness_detox.md",
+    "test_matrix_table.md",
+    "data_seeding_plan.md",
+    "schema-sql-1.md",
+    "history_analytics_data_model.md",
+    "data_model_samples.md",
+    "screen_flows.md",
+    "data_model.md",
+    "ui_snapshot.md",
+    "feature_map.md",
+    "plan-2026-03-11.md",
+    "rtm-apk-to-rn.md",
+    "rn-plan-mapping-2026-03-11.md",
+    "apk-analysis-2026-03-11.md",
+    "Untitled.md",
+    "src/main/java/com/openai/Main.java",
+    "src/main/java/com/openai/agents/SessionManager.java",
+    "src/main/java/com/openai/agents/Session.java",
+    "src/main/java/com/openai/openai/OpenAiClient.java",
+    "src/main/java/com/openai/openai",
+    "src/main/java/com/openai/agents/Message.java",
+    "src/main/java/com/openai/agents/Agent.java",
+    "src/main/java/com/openai/agents",
+    "src/main/java/com/openai",
+    "summary-2026-03-11.md",
+    "milestones.md",
+    "glossary.md"
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "url": "../../storage/1.0.0/storage-1.0.0.module",
+    "group": "org.asyncstorage.shared_storage",
+    "module": "storage",
+    "version": "1.0.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "8.14.3"
+    }
+  },
+  "variants": [
+    {
+      "name": "androidApiElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.jvm.environment": "android",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-api",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.2.10"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "shared-storage.aar",
+          "url": "storage-android-1.0.0.aar",
+          "size": 57581,
+          "sha512": "82549fd2939813817b41b8f725dea6efdf49e3016a2f8fd4960076ee2ce8a103169044aa56af8c3426c6fc0d2094425c15f0b7e2f3e9b6dceeef8f2e920e29f2",
+          "sha256": "0321de3f702e162b461540e20bca40c10090cfb8483380c410cb8162acba0003",
+          "sha1": "0bd0f3ee84093d814973e2ba384ab4e9dfa5254b",
+          "md5": "14e6853437f4aa0d0df8c6b28ce17c27"
+        }
+      ]
+    },
+    {
+      "name": "androidRuntimeElements-published",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.jvm.environment": "android",
+        "org.gradle.libraryelements": "aar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "dependencies": [
+        {
+          "group": "org.jetbrains.kotlin",
+          "module": "kotlin-stdlib",
+          "version": {
+            "requires": "2.2.10"
+          }
+        },
+        {
+          "group": "androidx.room",
+          "module": "room-runtime",
+          "version": {
+            "requires": "2.8.0"
+          }
+        },
+        {
+          "group": "androidx.sqlite",
+          "module": "sqlite-bundled",
+          "version": {
+            "requires": "2.6.0"
+          }
+        },
+        {
+          "group": "org.jetbrains.kotlinx",
+          "module": "kotlinx-coroutines-core",
+          "version": {
+            "requires": "1.10.2"
+          }
+        },
+        {
+          "group": "co.touchlab",
+          "module": "kermit",
+          "version": {
+            "requires": "2.0.4"
+          }
+        }
+      ],
+      "files": [
+        {
+          "name": "shared-storage.aar",
+          "url": "storage-android-1.0.0.aar",
+          "size": 57581,
+          "sha512": "82549fd2939813817b41b8f725dea6efdf49e3016a2f8fd4960076ee2ce8a103169044aa56af8c3426c6fc0d2094425c15f0b7e2f3e9b6dceeef8f2e920e29f2",
+          "sha256": "0321de3f702e162b461540e20bca40c10090cfb8483380c410cb8162acba0003",
+          "sha1": "0bd0f3ee84093d814973e2ba384ab4e9dfa5254b",
+          "md5": "14e6853437f4aa0d0df8c6b28ce17c27"
+        }
+      ]
+    },
+    {
+      "name": "androidSourcesElements-published",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.jvm.environment": "android",
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime",
+        "org.jetbrains.kotlin.platform.type": "jvm"
+      },
+      "files": [
+        {
+          "name": "shared-storage-android-sources.jar",
+          "url": "storage-android-1.0.0-sources.jar",
+          "size": 11370,
+          "sha512": "3e2f5cf5b561d62f79c45340ab8021a77b4145c23844d451db9640812b4c63321a82ddd4f469f69cb3c26ef59555b9813df7516169f0ce5841536fde584fe5b6",
+          "sha256": "4147fe63136b2091742ea0a777ef79d5fc991819a9272b59cb6c7dc0e8b04e39",
+          "sha1": "be3113d610de8b592e02d0c96532675133df0989",
+          "md5": "c429cc048eca26fa7615c0343063fbbb"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+
+
+# Colors Hex Full Map (Direct Hex Literals)
+
+Date: 2026-03-11
+App: HabitNow APK
+
+Direct Hex Values (excerpt of the full map; includes the literals you can rely on today):
+
+- abc_decor_view_status_guard: #ff000000
+- abc_decor_view_status_guard_light: #ffffffff
+- abc_search_url_text_normal: #ff7fa87f
+- androidx_core_ripple_material_light: #1f000000
+- androidx_core_secondary_text_default_material_light: #8a000000
+- bg_base_dark: #ff121212
+- bg_base_dark_opacity_1: #f0121212
+- bg_base_dark_opacity_2: #e0121212
+- bg_base_dark_opacity_3: #d1121212
+- bg_base_dark_opacity_4: #c2121212
+- bg_base_dark_opacity_5: #b3121212
+- bg_base_dark_opacity_6: #a2121212
+- bg_base_dark_opacity_7: #85121212
+- bg_base_dark_opacity_8: #66121212
+- bg_base_dark_opacity_9: #47121212
+- bg_base_light: #fff0f0f0
+- bg_base_light_amethyst: #fff7f5fa
+- bg_base_light_beach: #fffaf8f5
+- bg_base_light_berry: #fffaf5f5
+- bg_base_light_blue: #fff5f9fa
+- bg_base_light_brick: #fffaf5f6
+- bg_base_light_clear: #fff5faf8
+- bg_base_light_coffee: #fffaf6f5
+- bg_base_light_deep: #fff5f8fa
+- bg_base_light_earth: #fff5f9fa
+- bg_base_light_fall: #fffaf6f5
+- bg_base_light_forest: #fffaf7f5
+- bg_base_light_formal: #fff5faf9
+- bg_base_light_fresh: #fffaf5f5
+- bg_base_light_grass: #fff5faf5
+- bg_base_light_green: #fff9faf5
+- bg_base_light_lime: #fff5faf6
+- bg_base_light_marine: #fff5faf9
+- bg_base_light_mustard: #fffaf8f5
+- bg_base_light_ocean: #fff5f9fa
+- bg_base_light_old: #fff7f5fa
+- bg_base_light_opacity_1: #f0f0f0f0
+- bg_base_light_opacity_2: #e0f0f0f0
+- bg_base_light_opacity_3: #d1f0f0f0
+- bg_base_light_opacity_4: #c2f0f0f0
+- bg_base_light_opacity_5: #b3f0f0f0
+- bg_base_light_opacity_6: #a2f0f0f0
+- bg_base_light_opacity_7: #85f0f0f0
+- bg_base_light_opacity_8: #66f0f0f0
+- bg_base_light_opacity_9: #47f0f0f0
+- bg_base_light_orange: #fffaf6f5
+- bg_base_light_peach: #fffaf6f5
+- bg_base_light_pink: #fffaf5f6
+- bg_base_light_pop: #fff7f5fa
+- bg_base_light_purple: #fff8f5fa
+- bg_base_light_red: #fffaf5f5
+- bg_base_light_violet: #fff6f5fa
+- bg_base_light_vivid: #fffaf5f6
+- bg_base_light_warm: #fffaf8f5
+- bg_base_light_watermelon: #fffaf5f5
+- bg_base_light_yellow: #fffaf8f5
+- bg_base_night: #ff000000
+- bg_minus_1_light: #fff4f4f4
+- bg_minus_1_light_amethyst: #fff9f8fc
+- bg_minus_1_light_beach: #fffcfaf8
+- bg_minus_1_light_berry: #fffcf8f8
+- bg_minus_1_light_blue: #fff8fbfc
+- bg_minus_1_light_brick: #fffcf8f9
+- bg_minus_1_light_clear: #fff8fcfa
+- bg_minus_1_light_coffee: #fffcf9f8
+- bg_minus_1_light_deep: #fff8fafc
+- bg_minus_1_light_earth: #fff8fbfc
+- bg_minus_1_light_fall: #fffcf8f8
+- bg_minus_1_light_forest: #fffcfaf8
+- bg_minus_1_light_formal: #fff8fcfb
+- bg_minus_1_light_fresh: #fffcf8f8
+- bg_minus_1_light_grass: #fff8fcf8
+- bg_minus_1_light_green: #fffbfcf8
+- bg_minus_1_light_lime: #fff8fcf9
+- bg_minus_1_light_marine: #fff8fcfb
+- bg_minus_1_light_mustard: #fffcfbf8
+- bg_minus_1_light_ocean: #fff8fbfc
+- bg_minus_1_light_old: #fffaf8fc
+- bg_minus_1_light_orange: #fffcf9f8
+- bg_minus_1_light_peach: #fffcf9f8
+- bg_minus_1_light_pink: #fffcf8f9
+- bg_minus_1_light_pop: #fffaf8fc
+- bg_minus_1_light_purple: #fffaf8fc
+- bg_minus_1_light_red: #fffcf8f8
+- bg_minus_1_light_violet: #fff9f8fc
+- bg_minus_1_light_vivid: #fffcf8f9
+- bg_minus_1_light_warm: #fffcfaf8
+- bg_minus_1_light_watermelon: #fffcf8f8
+- bg_minus_1_light_yellow: #fffcfaf8
+- bg_minus_1_night: #ff111111
+- bg_plus_1_dark: #ff1c1c1c
+- bg_plus_1_light: #ffeaeaea
+- bg_plus_1_light_amethyst: #ffefebf4
+- bg_plus_1_light_beach: #fff4f1eb
+- bg_plus_1_light_berry: #fff4ebec
+- bg_plus_1_light_blue: #ffebf3f4
+- bg_plus_1_light_brick: #fff4ebed
+- bg_plus_1_light_clear: #ffebf4f1
+- bg_plus_1_light_coffee: #fff4edeb
+- bg_plus_1_light_deep: #ffebf0f4
+- bg_plus_1_light_earth: #ffebf3f4
+- COLORS_END
+
+Notes
+- This file captures the direct hex literals only. References to @color/... have been omitted for direct hex clarity. If you need every color reference resolved to a hex, I can resolve those in a follow-up.

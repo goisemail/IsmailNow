@@ -1,0 +1,60 @@
+{
+  "name": "HabitNow - Track Your Daily Habits",
+  "short_name": "HabitNow",
+  "description": "Build better habits with daily tracking and progress monitoring",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#007bff",
+  "scope": "/",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%23007bff'/><text x='96' y='128' font-size='96' font-weight='bold' fill='white' text-anchor='middle'>H</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%23007bff'/><text x='256' y='384' font-size='256' font-weight='bold' fill='white' text-anchor='middle'>H</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' fill='%23007bff' rx='45'/><text x='96' y='128' font-size='96' font-weight='bold' fill='white' text-anchor='middle'>H</text></svg>",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' fill='%23007bff' rx='120'/><text x='256' y='384' font-size='256' font-weight='bold' fill='white' text-anchor='middle'>H</text></svg>",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 540 720'><rect width='540' height='720' fill='%23f8f9fa'/><rect width='540' height='140' fill='%23007bff'/><text x='270' y='80' font-size='48' font-weight='bold' fill='white' text-anchor='middle'>HabitNow</text></svg>",
+      "sizes": "540x720",
+      "form_factor": "narrow"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Habit",
+      "short_name": "New Habit",
+      "description": "Create a new habit to track",
+      "url": "/habit/new",
+      "icons": [
+        {
+          "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><circle cx='96' cy='96' r='96' fill='%23007bff'/><text x='96' y='128' font-size='96' font-weight='bold' fill='white' text-anchor='middle'>+</text></svg>",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "categories": ["productivity", "health"],
+  "prefer_related_applications": false
+}

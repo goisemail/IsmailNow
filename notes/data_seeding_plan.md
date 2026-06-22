@@ -1,0 +1,13 @@
+### Data Seeding Plan (First Run)
+- Objective: Seed initial offline data on first install to provide a usable baseline.
+- Seed scope: Habits, Reminders, HabitInstance/history placeholders, UserProfile, Settings.
+- Seed content: example default Habit, optional Reminder, default user/settings values aligned with DM-spec-types.ts.
+- Seed source: static JSON assets or programmatic generator; offline-only.
+- Trigger: on first DB creation after app install; idempotent on subsequent launches.
+- Validation: UI shows initial habit; settings exist; no duplicates on re-seed.
+- Idempotency: seeds applied once; a migrations/seed_version table tracks seed application.
+- Acceptance Criteria:
+  - On first run, at least one Habit exists with a linked Reminder.
+  - UserProfile and Settings exist with defaults.
+  - Seeds do not create duplicates on subsequent launches.
+- Notes: ensure alignment with DM-spec-types.ts and data_model.md.

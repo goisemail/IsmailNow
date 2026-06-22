@@ -1,0 +1,67 @@
+.date-carousel {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.date-display {
+  text-align: center;
+}
+
+.date-chips {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.5rem 0;
+  scroll-behavior: smooth;
+}
+
+.date-chip {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid #dee2e6;
+  background: white;
+  color: #495057;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.date-chip:hover {
+  border-color: #007bff;
+  color: #007bff;
+}
+
+.date-chip.active {
+  background: #007bff;
+  color: white;
+  border-color: #007bff;
+}
+
+.habit-card {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  border: none;
+  transition: all 0.2s;
+}
+
+.habit-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+@media (max-width: 576px) {
+  .date-carousel {
+    padding: 0.75rem;
+    gap: 0.5rem;
+  }
+
+  .date-chip {
+    width: 40px;
+    height: 40px;
+    font-size: 0.875rem;
+  }
+}

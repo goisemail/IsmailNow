@@ -1,0 +1,277 @@
+/* Quick Add Sheet Animations */
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+.quick-add-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.quick-add-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  animation: fadeIn 0.3s ease-out;
+}
+
+.quick-add-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  background: #ffffff;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  max-height: 80vh;
+  overflow-y: auto;
+  transform: translateY(100%);
+  opacity: 0;
+  transition: none;
+}
+
+.quick-add-sheet.open {
+  animation: slideUp 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.quick-add-sheet:not(.open) {
+  animation: slideDown 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+.quick-add-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 16px 16px;
+  border-bottom: 1px solid #e9ecef;
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 10;
+}
+
+.quick-add-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #212529;
+  margin: 0;
+}
+
+.quick-add-close {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s;
+}
+
+.quick-add-close:hover {
+  opacity: 0.7;
+}
+
+.quick-add-items {
+  padding: 12px 8px 24px;
+}
+
+.quick-add-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: none;
+  border: none;
+  width: 100%;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  text-align: left;
+}
+
+.quick-add-item:hover {
+  background-color: #f8f9fa;
+}
+
+.quick-add-item:active {
+  background-color: #e9ecef;
+}
+
+.quick-add-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  background: #ffe0ec;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.quick-add-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.quick-add-item-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #212529;
+  margin-bottom: 2px;
+}
+
+.quick-add-item-subtitle {
+  font-size: 13px;
+  color: #6c757d;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* FAB Button */
+.fab {
+  position: fixed;
+  bottom: 90px;
+  right: 22px;
+  width: 62px;
+  height: 62px;
+  border-radius: 20px;
+  background: #E72372;
+  border: none;
+  color: white;
+  font-size: 34px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(231, 35, 114, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(231, 35, 114, 0.5);
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+.fab-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 576px) {
+  .quick-add-sheet {
+    max-height: 90vh;
+  }
+
+  .quick-add-item {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  .quick-add-icon-wrap {
+    width: 40px;
+    height: 40px;
+  }
+
+  .quick-add-item-title {
+    font-size: 15px;
+  }
+
+  .quick-add-item-subtitle {
+    font-size: 12px;
+  }
+
+  .fab {
+    bottom: 80px;
+    right: 16px;
+    width: 56px;
+    height: 56px;
+    font-size: 30px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .quick-add-sheet {
+    background: #2d2d2d;
+  }
+
+  .quick-add-header {
+    background: #2d2d2d;
+    border-bottom-color: #404040;
+  }
+
+  .quick-add-title {
+    color: #ffffff;
+  }
+
+  .quick-add-item:hover {
+    background-color: #3a3a3a;
+  }
+
+  .quick-add-item:active {
+    background-color: #404040;
+  }
+
+  .quick-add-item-title {
+    color: #ffffff;
+  }
+
+  .quick-add-item-subtitle {
+    color: #b0b0b0;
+  }
+}

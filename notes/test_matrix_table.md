@@ -1,0 +1,11 @@
+| Test ID | Title | Prerequisites | Steps (summary) | Expected Result | Status | Priority |
+|---|---|---|---|---|---|---|
+| HED-001 | Habit Editor - Create Habit | Fresh app/start, no conflicting data | Open Habit Editor; Enter valid name,color,icon; Set cadence and dates; Save | Habit appears in list and Habit Details; data persisted | Not Started | P1 |
+| HED-002 | Habit Editor - Validation (empty name) | Fresh or same baseline | Leave name empty; Attempt Save | Validation error; no habit saved | Not Started | P1 |
+| HED-003 | Habit Editor - Cadence validation | Fresh baseline | Set endDate before startDate; Save | Validation error; no save | Not Started | P2 |
+| REM-001 | Reminder - Create for Habit | Existing habit | Add reminder at 07:00 daily | Reminder saved and shown; notification scheduled (simulate) | Not Started | P1 |
+| REM-002 | Reminder - Enable/Disable | Existing reminder | Disable; verify not firing; re-enable | Scheduling toggles correctly | Not Started | P2 |
+| REM-003 | Reminder - Boot/Re-schedule | Existing reminder | Simulate device reboot; verify re-scheduled | Reminders re-scheduled | Not Started | P2 |
+| HIA-001 | History - Add Completion | Habit exists | Mark today completed | HabitInstance/history created; visible in history | Not Started | P1 |
+| HIA-002 | History Analytics - Range | History data exists | Open History/Analytics; select range | Metrics computed and shown; range affects results | Not Started | P2 |
+| HIA-003 | History Analytics - Streaks | Data exists | Check current/max streaks | Streak metrics correct | Not Started | P2 |
