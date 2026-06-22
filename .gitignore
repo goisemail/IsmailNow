@@ -9,7 +9,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Bun lockfile
-bun.lockb
+# bun.lockb
 
 # Dependencies
 node_modules/
