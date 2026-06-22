@@ -1,0 +1,13 @@
+{
+  "buildCommand": "cd web && bun run build",
+  "outputDirectory": "web/dist",
+  "installCommand": "bun install",
+  "devCommand": "cd web && bun run dev",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
