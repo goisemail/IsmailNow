@@ -7,6 +7,7 @@ import startOfWeek from 'date-fns/startOfWeek'
 import getDay from 'date-fns/getDay'
 import { enUS } from 'date-fns/locale'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
+import './Planner.css'
 
 const locales = { 'en-US': enUS }
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales })
@@ -28,8 +29,8 @@ export default function Planner() {
   )
 
   return (
-    <div className="container py-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
+    <div className="planner-page">
+      <div className="planner-header">
         <h1 className="h3 mb-0">Planner</h1>
         <div className="btn-group" role="group" aria-label="Planner view">
           <button
@@ -59,18 +60,20 @@ export default function Planner() {
         </div>
       </div>
 
-      <div className="card p-3">
-        <BigCalendar
-          localizer={localizer}
-          events={plannerEvents}
-          startAccessor="start"
-          endAccessor="end"
-          style={{ height: 500 }}
-          views={['day', 'week', 'month']}
-          defaultView={plannerMode}
-          view={plannerMode}
-          onView={(v: any) => setPlannerMode(v as any)}
-        />
+      <div className="planner-calendar-wrap">
+        <div className="card">
+          <BigCalendar
+            localizer={localizer}
+            events={plannerEvents}
+            startAccessor="start"
+            endAccessor="end"
+            style={{ height: '100%' }}
+            views={['day', 'week', 'month']}
+            defaultView={plannerMode}
+            view={plannerMode}
+            onView={(v: any) => setPlannerMode(v as any)}
+          />
+        </div>
       </div>
     </div>
   )
