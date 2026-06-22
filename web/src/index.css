@@ -15,29 +15,39 @@
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
-  display: flex;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
   min-width: 320px;
-  min-height: 100vh;
+}
+
+body {
+  display: flex;
 }
 
 #root {
   width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-wrapper {
   width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
-  padding-bottom: 80px; /* Space for bottom nav */
+  overflow: hidden;
 }
 
-@media (max-width: 576px) {
-  .app-wrapper {
-    padding-bottom: 70px;
-  }
+/* Scrollable content area sits above the bottom nav */
+.page-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Bootstrap overrides for custom styling */

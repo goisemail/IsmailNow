@@ -1,0 +1,10 @@
+.tasks-page {
+  padding-bottom: 1rem;
+}
+
+@media (max-width: 576px) {
+  .tasks-page {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+}
