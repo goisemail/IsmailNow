@@ -1,0 +1,103 @@
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0);
+  z-index: 100;
+  pointer-events: none;
+  transition: background-color 0.22s ease;
+}
+
+.sidebar-overlay.open {
+  background-color: rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+}
+
+.sidebar-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 70%;
+  max-width: 300px;
+  background-color: #050507;
+  z-index: 101;
+  transform: translateX(-100%);
+  transition: transform 0.22s ease;
+  display: flex;
+  flex-direction: column;
+  padding-top: 56px;
+  padding-left: 16px;
+  padding-right: 16px;
+  overflow-y: auto;
+}
+
+.sidebar-panel.open {
+  transform: translateX(0);
+}
+
+@media (prefers-color-scheme: light) {
+  .sidebar-panel {
+    background-color: #1a1a2e;
+  }
+}
+
+.sidebar-close-btn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: none;
+  border: none;
+  color: #9b9ea7;
+  font-size: 1.4rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px 8px;
+}
+
+.sidebar-close-btn:hover {
+  color: #d7d8dc;
+}
+
+.sidebar-brand {
+  color: #e72372;
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.sidebar-date-title {
+  color: #d7d8dc;
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.sidebar-date-sub {
+  color: #9b9ea7;
+  font-size: 0.95rem;
+  margin-top: 2px;
+}
+
+.sidebar-divider {
+  height: 1px;
+  background-color: #1a1c22;
+  margin: 20px 0;
+}
+
+.sidebar-item {
+  color: #c8cad0;
+  font-size: 1.05rem;
+  padding: 10px 0;
+  cursor: pointer;
+  text-decoration: none;
+  display: block;
+  background: none;
+  border: none;
+  text-align: left;
+  width: 100%;
+}
+
+.sidebar-item:hover {
+  color: #e72372;
+  text-decoration: none;
+}

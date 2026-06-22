@@ -1,18 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useHabitsStore, Habit } from '../store/habits'
 import { useTasksStore } from '../store/tasks'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import { formatDate, getDateRange, formatDateDisplay } from '../utils/date'
 import './Dashboard.css'
 import QuickAddSheet from '../components/QuickAddSheet'
-
-import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar'
-import format from 'date-fns/format'
-import parse from 'date-fns/parse'
-import startOfWeek from 'date-fns/startOfWeek'
-import getDay from 'date-fns/getDay'
-import { enUS } from 'date-fns/locale'
-import 'react-big-calendar/lib/css/react-big-calendar.css'
 
 export default function Dashboard() {
   const habits = useHabitsStore((state) => state.habits)
@@ -64,27 +56,10 @@ export default function Dashboard() {
   const tasksForDate = tasks.filter((task) => task.startDate === selectedDate)
   const completedTasks = tasksForDate.filter((task) => task.completedDate === selectedDate)
 
-  const locales = { 'en-US': enUS }
-  const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales })
-  const [plannerMode, setPlannerMode] = useState<'day' | 'week' | 'month'>('week')
-
-  const plannerEvents = useMemo(
-    () =>
-      tasks.map((task, index) => {
-        const start = new Date(`${task.startDate}T09:00:00`)
-        start.setHours(9 + (index % 8), 0, 0, 0)
-        const end = new Date(start)
-        end.setHours(start.getHours() + 1)
-        return { title: task.title, start, end, id: task.id }
-      }),
-    [tasks],
-  )
-
   return (
     <div className="dashboard container-lg py-4">
       {/* Header */}
       <div className="mb-4">
-        <h1 className="h3 mb-2">HabitNow</h1>
         <p className="text-muted mb-0">Track your daily progress</p>
       </div>
 
@@ -121,32 +96,6 @@ export default function Dashboard() {
             {formatDateDisplay(date).split(' ')[0].charAt(0)}
           </button>
         ))}
-      </div>
-
-      {/* Planner Section */}
-      <div className="mb-4">
-        <div className="d-flex justify-content-between align-items-center mb-2">
-          <h2 className="h5 mb-0">Planner</h2>
-          <div className="btn-group" role="group" aria-label="Planner view">
-            <button type="button" className={`btn btn-sm ${plannerMode==='day' ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setPlannerMode('day')} data-testid="planner-day">Day</button>
-            <button type="button" className={`btn btn-sm ${plannerMode==='week' ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setPlannerMode('week')} data-testid="planner-week">Week</button>
-            <button type="button" className={`btn btn-sm ${plannerMode==='month' ? 'btn-primary' : 'btn-outline-secondary'}`} onClick={() => setPlannerMode('month')} data-testid="planner-month">Month</button>
-          </div>
-        </div>
-
-        <div className="card p-3">
-          <BigCalendar
-            localizer={localizer}
-            events={plannerEvents}
-            startAccessor="start"
-            endAccessor="end"
-            style={{ height: 500 }}
-            views={["day","week","month"]}
-            defaultView={plannerMode}
-            view={plannerMode}
-            onView={(v: any) => setPlannerMode(v as any)}
-          />
-        </div>
       </div>
 
       {/* Habits Section */}

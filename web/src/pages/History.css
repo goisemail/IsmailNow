@@ -1,0 +1,59 @@
+.history-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 12px 16px 8px;
+}
+
+.history-header {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.history-calendar-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.history-calendar-wrap .card {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+}
+
+.history-calendar-wrap .rbc-calendar {
+  flex: 1;
+  min-height: 0;
+}
+
+.history-stats {
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.history-stats .card {
+  flex: 1;
+  padding: 10px;
+  text-align: center;
+  min-width: 0;
+}
+
+.history-stats .h2 {
+  font-size: 1.4rem;
+  margin: 0;
+}
+
+.history-stats .text-muted {
+  font-size: 0.75rem;
+}
