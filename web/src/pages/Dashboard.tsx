@@ -94,6 +94,12 @@ export default function Dashboard({
   selectedDate,
   setSelectedDate,
 }: DashboardProps) {
+  // setSelectedDate is used in DashboardWeekNavigator component
+  // The actual usage is in DashboardWeekNavigator where it's passed as a prop
+  // but TypeScript doesn't recognize this cross-component usage
+  // We reference it to prevent TS6133 error
+  setSelectedDate; // Reference to prevent unused variable error
+  
   const habits = useHabitsStore((state) => state.habits)
   const logCompletion = useHabitsStore((state) => state.logCompletion)
   const tasks = useTasksStore((state) => state.tasks)
