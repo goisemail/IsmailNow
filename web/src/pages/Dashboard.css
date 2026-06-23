@@ -2,68 +2,70 @@
 .week-row {
   display: flex;
   align-items: center;
+  width: 100%;
+  gap: 4px;
   padding-left: 4px;
   padding-right: 4px;
   margin-bottom: 4px;
-  gap: 4px;
+  box-sizing: border-box;
 }
 
 .week-nav-btn {
-  padding: 8px;
-  background: none;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #6c757d;
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #495057;
-  transition: color 0.2s;
+  color: #ffffff;
+  transition: background-color 0.2s;
+  padding: 0;
 }
 
 .week-nav-btn:hover {
-  color: #212529;
+  background: #5a6268;
+}
+
+.week-nav-btn:active {
+  background: #495057;
 }
 
 /* Week Days Scroll Container */
 .week-days-scroll {
   display: flex;
-  gap: 6px;
-  padding: 0 4px;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
   overflow-x: auto;
   scroll-behavior: smooth;
-  flex: 1;
   align-items: center;
+  padding: 0 2px;
 }
 
 .week-days-scroll::-webkit-scrollbar {
-  height: 4px;
-}
-
-.week-days-scroll::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.week-days-scroll::-webkit-scrollbar-thumb {
-  background: #dee2e6;
-  border-radius: 2px;
+  height: 0;
 }
 
 /* Week Day Chip */
 .week-day-chip {
-  flex-shrink: 0;
-  width: 78px;
+  flex: 1;
+  min-width: 40px;
   height: 64px;
   border-radius: 14px;
   background: #f8f9fa;
   border: 1px solid #dee2e6;
   cursor: pointer;
   transition: all 0.2s;
-  padding: 8px;
+  padding: 4px 2px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .week-day-chip:hover {
@@ -78,10 +80,14 @@
 }
 
 .week-day-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   color: #6c757d;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
 }
 
 .week-day-chip.active .week-day-label {
@@ -89,13 +95,46 @@
 }
 
 .week-date-text {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   color: #212529;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+  text-align: center;
 }
 
 .week-day-chip.active .week-date-text {
   color: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  .week-nav-btn {
+    background: #495057;
+  }
+
+  .week-nav-btn:hover {
+    background: #343a40;
+  }
+
+  .week-day-chip {
+    background: #2d2d2d;
+    border-color: #495057;
+  }
+
+  .week-day-chip:hover {
+    background: #3a3a3a;
+    border-color: #6c757d;
+  }
+
+  .week-day-label {
+    color: #adb5bd;
+  }
+
+  .week-date-text {
+    color: #f8f9fa;
+  }
 }
 
 /* Task List Styling */
@@ -270,21 +309,22 @@
   }
 
   .week-nav-btn {
-    padding: 6px;
+    width: 32px;
+    height: 32px;
   }
 
   .week-day-chip {
-    width: 72px;
-    height: 60px;
-    padding: 6px;
+    height: 56px;
+    border-radius: 10px;
+    gap: 2px;
   }
 
   .week-day-label {
-    font-size: 10px;
+    font-size: 9px;
   }
 
   .week-date-text {
-    font-size: 12px;
+    font-size: 10px;
   }
 
   .task-row {
@@ -311,5 +351,25 @@
     width: 40px;
     height: 40px;
     font-size: 0.875rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .week-day-chip {
+    height: 68px;
+    border-radius: 16px;
+  }
+
+  .week-day-label {
+    font-size: 11px;
+  }
+
+  .week-date-text {
+    font-size: 12px;
+  }
+
+  .week-nav-btn {
+    width: 40px;
+    height: 40px;
   }
 }

@@ -248,7 +248,7 @@ export function DashboardScreen(): React.JSX.Element {
       const d = new Date(ms);
       const key = d.toISOString().slice(0, 10);
       const display = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
-      const weekday = display.toLocaleDateString('en-US', {weekday: 'long'});
+      const weekday = display.toLocaleDateString('en-US', {weekday: 'short'});
       const dateLabel = display.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -415,11 +415,11 @@ export function DashboardScreen(): React.JSX.Element {
       </View>
 
       <View style={styles.weekRow}>
-        {/* Right arrow (→) placed on LEFT side — navigate to next week */}
+        {/* Left arrow (←) — navigate to previous week */}
         <Pressable
           style={styles.weekNavBtn}
-          onPress={() => setWeekOffset(w => w + 1)}>
-          <ChevronRight size={22} color="#F1F1F3" strokeWidth={2} />
+          onPress={() => setWeekOffset(w => w - 1)}>
+          <ChevronLeft size={20} color="#FFFFFF" strokeWidth={2} />
         </Pressable>
         <ScrollView
           horizontal
@@ -434,11 +434,11 @@ export function DashboardScreen(): React.JSX.Element {
             />
           ))}
         </ScrollView>
-        {/* Left arrow (←) placed on RIGHT side — navigate to previous week */}
+        {/* Right arrow (→) — navigate to next week */}
         <Pressable
           style={styles.weekNavBtn}
-          onPress={() => setWeekOffset(w => w - 1)}>
-          <ChevronLeft size={22} color="#F1F1F3" strokeWidth={2} />
+          onPress={() => setWeekOffset(w => w + 1)}>
+          <ChevronRight size={20} color="#FFFFFF" strokeWidth={2} />
         </Pressable>
       </View>
 
@@ -802,7 +802,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   weekNavBtn: {
-    padding: 8,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#6C757D',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   weekDaysContent: {
     gap: 6,

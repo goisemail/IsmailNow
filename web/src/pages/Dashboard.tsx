@@ -38,7 +38,7 @@ export default function Dashboard() {
       const d = new Date(ms)
       const key = d.toISOString().slice(0, 10)
       const display = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
-      const weekday = display.toLocaleDateString('en-US', {weekday: 'long'})
+      const weekday = display.toLocaleDateString('en-US', {weekday: 'short'})
       const dateLabel = display.toLocaleDateString('en-US', {
         month: 'short',
         day: 'numeric',
@@ -81,13 +81,13 @@ export default function Dashboard() {
 
       {/* Week Date Navigator */}
       <div className="week-row mb-4">
-        {/* Right arrow (→) placed on LEFT side — navigate to next week */}
+        {/* Left arrow (←) — navigate to previous week */}
         <button
           className="week-nav-btn"
-          onClick={() => setWeekOffset(w => w + 1)}
-          aria-label="Next week"
+          onClick={() => setWeekOffset(w => w - 1)}
+          aria-label="Previous week"
         >
-          <ChevronRight size={22} />
+          <ChevronLeft size={20} />
         </button>
 
         <div className="week-days-scroll">
@@ -103,13 +103,13 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Left arrow (←) placed on RIGHT side — navigate to previous week */}
+        {/* Right arrow (→) — navigate to next week */}
         <button
           className="week-nav-btn"
-          onClick={() => setWeekOffset(w => w - 1)}
-          aria-label="Previous week"
+          onClick={() => setWeekOffset(w => w + 1)}
+          aria-label="Next week"
         >
-          <ChevronLeft size={22} />
+          <ChevronRight size={20} />
         </button>
       </div>
 
