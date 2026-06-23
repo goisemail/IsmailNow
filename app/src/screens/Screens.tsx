@@ -249,10 +249,7 @@ export function DashboardScreen(): React.JSX.Element {
       const key = d.toISOString().slice(0, 10);
       const display = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
       const weekday = display.toLocaleDateString('en-US', {weekday: 'short'});
-      const dateLabel = display.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      });
+      const dateLabel = String(display.getDate());
       return {key, weekday, dateLabel};
     });
   }, [weekOffset]);
@@ -421,10 +418,7 @@ export function DashboardScreen(): React.JSX.Element {
           onPress={() => setWeekOffset(w => w - 1)}>
           <ChevronLeft size={20} color="#FFFFFF" strokeWidth={2} />
         </Pressable>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.weekDaysContent}>
+        <View style={styles.weekDaysContent}>
           {weekDays.map(d => (
             <WeekDayChip
               key={d.key}
@@ -433,7 +427,7 @@ export function DashboardScreen(): React.JSX.Element {
               onPress={() => setSelectedDateKey(d.key)}
             />
           ))}
-        </ScrollView>
+        </View>
         {/* Right arrow (→) — navigate to next week */}
         <Pressable
           style={styles.weekNavBtn}
@@ -810,24 +804,26 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   weekDaysContent: {
-    gap: 6,
-    paddingHorizontal: 4,
+    flex: 1,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 2,
   },
   weekDayChip: {
-    width: 78,
-    height: 64,
-    borderRadius: 14,
+    flex: 1,
+    height: 56,
+    borderRadius: 12,
     backgroundColor: '#1A1B20',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 2,
   },
   weekDayChipSelected: {
-    backgroundColor: '#DD1767',
+    backgroundColor: '#FF9500',
   },
   weekDayLabel: {
     color: '#B9BBC2',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '600',
   },
   weekDayLabelSelected: {
@@ -835,7 +831,7 @@ const styles = StyleSheet.create({
   },
   weekDateText: {
     color: '#ECECF0',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
   },
   weekDateTextSelected: {
