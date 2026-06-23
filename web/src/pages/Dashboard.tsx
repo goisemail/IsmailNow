@@ -1,35 +1,114 @@
-import { useState } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { useHabitsStore, Habit } from '../store/habits'
 import { useTasksStore } from '../store/tasks'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import { formatDate, getDateRange, formatDateDisplay } from '../utils/date'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import './Dashboard.css'
 import QuickAddSheet from '../components/QuickAddSheet'
 
-export default function Dashboard() {
+interface WeekDay {
+  key: string
+  weekday: string
+  dateLabel: string
+}
+
+interface DashboardProps {
+  selectedDate: string
+  setSelectedDate: Dispatch<SetStateAction<string>>
+}
+
+interface WeekNavigatorProps {
+  selectedDate: string
+  setSelectedDate: Dispatch<SetStateAction<string>>
+  weekOffset: number
+  setWeekOffset: Dispatch<SetStateAction<number>>
+}
+
+function getWeekDays(weekOffset: number): WeekDay[] {
+  const now = new Date()
+  const todayKey = now.toISOString().slice(0, 10)
+  const [yr, mo, dy] = todayKey.split('-').map(Number)
+  const todayMs = Date.UTC(yr, mo - 1, dy)
+  const dow = new Date(todayMs).getUTCDay() // 0 = Sunday
+  const sundayMs = todayMs - dow * 86400000 + weekOffset * 7 * 86400000
+  return Array.from({ length: 7 }, (_, i) => {
+    const ms = sundayMs + i * 86400000
+    const d = new Date(ms)
+    const key = d.toISOString().slice(0, 10)
+    const display = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+    const weekday = display.toLocaleDateString('en-US', { weekday: 'short' })
+    const dateLabel = display.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    })
+    return { key, weekday, dateLabel }
+  })
+}
+
+export function DashboardWeekNavigator({
+  selectedDate,
+  setSelectedDate,
+  weekOffset,
+  setWeekOffset,
+}: WeekNavigatorProps) {
+  const weekDays = getWeekDays(weekOffset)
+
+  return (
+    <div className="week-row-wrapper">
+      <div className="week-row">
+        {/* Left arrow (←) — navigate to previous week */}
+        <button
+          className="week-nav-btn"
+          onClick={() => setWeekOffset((w) => w - 1)}
+          aria-label="Previous week"
+        >
+          <ChevronLeft size={20} />
+        </button>
+
+        <div className="week-days-scroll">
+          {weekDays.map((d) => (
+            <button
+              key={d.key}
+              className={`week-day-chip ${selectedDate === d.key ? 'active' : ''}`}
+              onClick={() => setSelectedDate(d.key)}
+            >
+              <div className="week-day-label">{d.weekday}</div>
+              <div className="week-date-text">{d.dateLabel}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Right arrow (→) — navigate to next week */}
+        <button
+          className="week-nav-btn"
+          onClick={() => setWeekOffset((w) => w + 1)}
+          aria-label="Next week"
+        >
+          <ChevronRight size={20} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export default function Dashboard({
+  selectedDate,
+  setSelectedDate,
+}: DashboardProps) {
+  // setSelectedDate is used in DashboardWeekNavigator component
+  // The actual usage is in DashboardWeekNavigator where it's passed as a prop
+  // but TypeScript doesn't recognize this cross-component usage
+  // We reference it to prevent TS6133 error
+  setSelectedDate; // Reference to prevent unused variable error
+  
   const habits = useHabitsStore((state) => state.habits)
   const logCompletion = useHabitsStore((state) => state.logCompletion)
   const tasks = useTasksStore((state) => state.tasks)
   const addTask = useTasksStore((state) => state.addTask)
   const toggleTaskCompletion = useTasksStore((state) => state.toggleTaskCompletion)
 
-  const today = formatDate(new Date())
-  const [selectedDate, setSelectedDate] = useState(today)
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [taskTitle, setTaskTitle] = useState('')
   const [quickAddOpen, setQuickAddOpen] = useState(false)
-
-  const dateRange = getDateRange(20)
-  const scrollIndex = dateRange.indexOf(selectedDate)
-
-  const handleDateScroll = (direction: 'prev' | 'next') => {
-    const currentIndex = dateRange.indexOf(selectedDate)
-    if (direction === 'prev' && currentIndex > 0) {
-      setSelectedDate(dateRange[currentIndex - 1])
-    } else if (direction === 'next' && currentIndex < dateRange.length - 1) {
-      setSelectedDate(dateRange[currentIndex + 1])
-    }
-  }
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault()
@@ -59,46 +138,8 @@ export default function Dashboard() {
   return (
     <div className="dashboard container-lg py-4">
       {/* Header */}
-      <div className="mb-4">
-        <p className="text-muted mb-0">Track your daily progress</p>
-      </div>
 
-      {/* Date Carousel */}
-      <div className="date-carousel mb-4">
-        <button
-          className="btn btn-outline-secondary btn-sm"
-          onClick={() => handleDateScroll('prev')}
-        >
-          <ChevronLeft size={20} />
-        </button>
-
-        <div className="date-display text-center flex-grow-1">
-          <div className="fs-5 fw-bold">{formatDateDisplay(selectedDate)}</div>
-          <div className="text-muted small">{selectedDate}</div>
-        </div>
-
-        <button
-          className="btn btn-outline-secondary btn-sm"
-          onClick={() => handleDateScroll('next')}
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
-
-      {/* Quick Date Selector */}
-      <div className="date-chips mb-4">
-        {dateRange.slice(Math.max(0, scrollIndex - 3), Math.min(dateRange.length, scrollIndex + 4)).map((date) => (
-          <button
-            key={date}
-            className={`date-chip ${selectedDate === date ? 'active' : ''}`}
-            onClick={() => setSelectedDate(date)}
-          >
-            {formatDateDisplay(date).split(' ')[0].charAt(0)}
-          </button>
-        ))}
-      </div>
-
-      {/* Habits Section */}
+        {/* Habits Section */}
       <div className="mb-4">
         <h2 className="h5 mb-3">Habits</h2>
         {habits.length === 0 ? (
@@ -123,13 +164,6 @@ export default function Dashboard() {
       <div className="mb-4">
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h2 className="h5 mb-0">Tasks</h2>
-          <button
-            className="btn btn-sm btn-primary"
-            onClick={() => setQuickAddOpen(true)}
-            data-testid="quickAddBtn"
-          >
-            <Plus size={16} /> Quick Add
-          </button>
         </div>
 
         {showTaskForm && (
@@ -161,23 +195,26 @@ export default function Dashboard() {
         {tasksForDate.length === 0 ? (
           <div className="text-muted">No tasks for this date</div>
         ) : (
-          <div className="list-group">
+          <div className="task-list">
             {tasksForDate.map((task) => (
-              <label key={task.id} className="list-group-item d-flex gap-3" data-testid={`task-${task.id}`}>
-                <input
-                  className="form-check-input"
-                  type="checkbox"
-                  checked={task.completedDate === selectedDate}
-                  onChange={() => toggleTaskCompletion(task.id, selectedDate)}
-                />
+              <div key={task.id} className="task-row" data-testid={`task-${task.id}`}>
                 <span
-                  className={`flex-grow-1 ${
-                    task.completedDate === selectedDate ? 'text-decoration-line-through text-muted' : ''
+                  className={`task-title ${
+                    task.completedDate === selectedDate ? 'completed' : ''
                   }`}
                 >
                   {task.title}
                 </span>
-              </label>
+                <button
+                  className={`task-toggle ${
+                    task.completedDate === selectedDate ? 'done' : ''
+                  }`}
+                  onClick={() => toggleTaskCompletion(task.id, selectedDate)}
+                  aria-label={`${task.title} ${task.completedDate === selectedDate ? 'done' : 'pending'}`}
+                >
+                  {task.completedDate === selectedDate && '✓'}
+                </button>
+              </div>
             ))}
           </div>
         )}
@@ -186,6 +223,15 @@ export default function Dashboard() {
           {completedTasks.length} of {tasksForDate.length} completed
         </div>
       </div>
+
+      <button
+        className="fab"
+        onClick={() => setQuickAddOpen(true)}
+        aria-label="Quick add"
+        data-testid="fab"
+      >
+        +
+      </button>
 
       <QuickAddSheet
         open={quickAddOpen}

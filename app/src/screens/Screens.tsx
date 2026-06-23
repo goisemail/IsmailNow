@@ -5,7 +5,6 @@ import {
   Text,
   View,
   ScrollView,
-  FlatList,
   Animated,
   Dimensions,
   Platform,
@@ -29,11 +28,11 @@ import {
   CheckCircle2,
   LayoutGrid,
   Timer,
-  Clock3,
   Check,
   Trophy,
   Repeat,
   ChevronRight,
+  ChevronLeft,
 } from 'lucide-react-native';
 import {appColors} from '../theme/colors';
 import {useHabitsStore} from '../store/habits';
@@ -48,10 +47,10 @@ type ActivityItem = {
   done?: boolean;
 };
 
-type DayChip = {
+type WeekDay = {
   key: string;
   weekday: string;
-  day: number;
+  dateLabel: string;
 };
 
 type FooterTab = 'Home' | 'Habits' | 'Tasks' | 'Planner' | 'Timer';
@@ -94,28 +93,32 @@ function NavButton({
   );
 }
 
-function DateChip({
+function WeekDayChip({
   item,
   selected,
   onPress,
 }: {
-  item: DayChip;
+  item: WeekDay;
   selected: boolean;
   onPress: () => void;
 }): React.JSX.Element {
   return (
     <Pressable
-      style={[styles.dateChip, selected ? styles.dateChipSelected : null]}
+      style={[styles.weekDayChip, selected ? styles.weekDayChipSelected : null]}
       onPress={onPress}>
       <Text
         style={[
-          styles.dateWeekday,
-          selected ? styles.dateWeekdaySelected : null,
+          styles.weekDayLabel,
+          selected ? styles.weekDayLabelSelected : null,
         ]}>
         {item.weekday}
       </Text>
-      <Text style={[styles.dateDay, selected ? styles.dateDaySelected : null]}>
-        {item.day}
+      <Text
+        style={[
+          styles.weekDateText,
+          selected ? styles.weekDateTextSelected : null,
+        ]}>
+        {item.dateLabel}
       </Text>
     </Pressable>
   );
@@ -134,9 +137,7 @@ function ActivityRow({item}: {item: ActivityItem}): React.JSX.Element {
 }
 
 const DRAWER_WIDTH = Math.round(Dimensions.get('window').width * 0.6);
-const TOTAL_DAYS = 20001;
-const TODAY_INDEX = Math.floor(TOTAL_DAYS / 2);
-const DATE_CHIP_TOTAL = 66;
+const FOOTER_HEIGHT = 76;
 const FOOTER_TABS: FooterTab[] = [
   'Home',
   'Habits',
@@ -233,10 +234,25 @@ export function DashboardScreen(): React.JSX.Element {
   const drawerX = useState(new Animated.Value(-DRAWER_WIDTH))[0];
   const overlayOpacity = useState(new Animated.Value(0))[0];
 
-  const dayIndexes = useMemo<number[]>(
-    () => Array.from({length: TOTAL_DAYS}, (_, i) => i),
-    [],
-  );
+  const [weekOffset, setWeekOffset] = useState(0);
+
+  const weekDays = useMemo<WeekDay[]>(() => {
+    const now = new Date();
+    const todayKey = now.toISOString().slice(0, 10);
+    const [yr, mo, dy] = todayKey.split('-').map(Number);
+    const todayMs = Date.UTC(yr, mo - 1, dy);
+    const dow = new Date(todayMs).getUTCDay(); // 0 = Sunday
+    const sundayMs = todayMs - dow * 86400000 + weekOffset * 7 * 86400000;
+    return Array.from({length: 7}, (_, i) => {
+      const ms = sundayMs + i * 86400000;
+      const d = new Date(ms);
+      const key = d.toISOString().slice(0, 10);
+      const display = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      const weekday = display.toLocaleDateString('en-US', {weekday: 'short'});
+      const dateLabel = String(display.getDate());
+      return {key, weekday, dateLabel};
+    });
+  }, [weekOffset]);
 
   const [selectedDateKey, setSelectedDateKey] = useState(
     new Date().toISOString().slice(0, 10),
@@ -301,18 +317,6 @@ export function DashboardScreen(): React.JSX.Element {
     day: 'numeric',
     year: 'numeric',
   });
-
-  const getDayChip = (index: number): DayChip => {
-    const now = new Date();
-    const offset = index - TODAY_INDEX;
-    const d = new Date(now);
-    d.setDate(now.getDate() + offset);
-    return {
-      key: d.toISOString().slice(0, 10),
-      weekday: d.toLocaleDateString('en-US', {weekday: 'short'}),
-      day: d.getDate(),
-    };
-  };
 
   const openDrawer = () => {
     setDrawerOpen(true);
@@ -407,30 +411,30 @@ export function DashboardScreen(): React.JSX.Element {
         </View>
       </View>
 
-      <FlatList
-        horizontal
-        style={styles.dateRow}
-        data={dayIndexes}
-        initialScrollIndex={TODAY_INDEX}
-        getItemLayout={(_, index) => ({
-          length: DATE_CHIP_TOTAL,
-          offset: DATE_CHIP_TOTAL * index,
-          index,
-        })}
-        contentContainerStyle={styles.dateRowContent}
-        showsHorizontalScrollIndicator={false}
-        keyExtractor={item => String(item)}
-        renderItem={({item}) => {
-          const d = getDayChip(item);
-          return (
-            <DateChip
+      <View style={styles.weekRow}>
+        {/* Left arrow (←) — navigate to previous week */}
+        <Pressable
+          style={styles.weekNavBtn}
+          onPress={() => setWeekOffset(w => w - 1)}>
+          <ChevronLeft size={20} color="#FFFFFF" strokeWidth={2} />
+        </Pressable>
+        <View style={styles.weekDaysContent}>
+          {weekDays.map(d => (
+            <WeekDayChip
+              key={d.key}
               item={d}
               selected={selectedDateKey === d.key}
               onPress={() => setSelectedDateKey(d.key)}
             />
-          );
-        }}
-      />
+          ))}
+        </View>
+        {/* Right arrow (→) — navigate to next week */}
+        <Pressable
+          style={styles.weekNavBtn}
+          onPress={() => setWeekOffset(w => w + 1)}>
+          <ChevronRight size={20} color="#FFFFFF" strokeWidth={2} />
+        </Pressable>
+      </View>
 
       <View style={styles.todayBody}>
         {activeTab === 'Planner' ? (
@@ -496,15 +500,7 @@ export function DashboardScreen(): React.JSX.Element {
               if (item.type === 'pending_task') {
                 return (
                   <View key={item.id} style={styles.taskRow}>
-                    <View style={styles.taskLeft}>
-                      <View style={styles.taskIconBadge}>
-                        <Clock3 size={18} color="#0A0A0D" strokeWidth={2.4} />
-                      </View>
-                      <View>
-                        <Text style={styles.taskTitle}>{item.title}</Text>
-                        <Text style={styles.taskChip}>Task</Text>
-                      </View>
-                    </View>
+                    <Text style={styles.taskTitle}>{item.title}</Text>
                     <Pressable
                       style={[
                         styles.taskToggle,
@@ -793,39 +789,53 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
   },
-  dateRow: {
-    maxHeight: 66,
+  weekRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    paddingHorizontal: 4,
+    marginBottom: 4,
   },
-  dateRowContent: {
-    paddingHorizontal: 12,
-    gap: 10,
+  weekNavBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#6C757D',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  dateChip: {
-    width: 56,
-    height: 60,
-    borderRadius: 14,
+  weekDaysContent: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 4,
+    paddingHorizontal: 2,
+  },
+  weekDayChip: {
+    flex: 1,
+    height: 56,
+    borderRadius: 12,
     backgroundColor: '#1A1B20',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
+    gap: 2,
   },
-  dateChipSelected: {
-    backgroundColor: '#DD1767',
+  weekDayChipSelected: {
+    backgroundColor: '#FF9500',
   },
-  dateWeekday: {
+  weekDayLabel: {
     color: '#B9BBC2',
-    fontSize: 12,
+    fontSize: 10,
+    fontWeight: '600',
   },
-  dateWeekdaySelected: {
+  weekDayLabelSelected: {
     color: '#FFFFFF',
   },
-  dateDay: {
+  weekDateText: {
     color: '#ECECF0',
-    fontSize: 24,
+    fontSize: 12,
     fontWeight: '700',
-    lineHeight: 26,
   },
-  dateDaySelected: {
+  weekDateTextSelected: {
     color: '#FFFFFF',
   },
   todayBody: {
@@ -919,39 +929,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  taskLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flex: 1,
-  },
-  taskIconBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 9,
-    backgroundColor: '#E72372',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  taskIcon: {
-    color: '#0A0A0D',
-    fontSize: 20,
-  },
   taskTitle: {
     color: '#F2F3F7',
     fontSize: 15,
     fontWeight: '500',
-  },
-  taskChip: {
-    alignSelf: 'flex-start',
-    marginTop: 4,
-    color: '#F02A78',
-    backgroundColor: '#38111F',
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    fontSize: 12,
-    fontWeight: '600',
+    flex: 1,
   },
   taskToggle: {
     width: 36,
@@ -972,13 +954,14 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 22,
-    bottom: 92,
+    bottom: FOOTER_HEIGHT + 16,
     width: 62,
     height: 62,
-    borderRadius: 20,
-    backgroundColor: '#D81764',
+    borderRadius: 31,
+    backgroundColor: '#FF9500',
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 20,
   },
   fabText: {
     color: '#FFFFFF',
@@ -1085,7 +1068,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 22,
     paddingVertical: 10,
     marginHorizontal: 8,
-    marginBottom: 8,
+    marginBottom: FOOTER_HEIGHT + 8,
   },
   quickAddRow: {
     flexDirection: 'row',
@@ -1139,7 +1122,7 @@ const styles = StyleSheet.create({
     paddingTop: 18,
     paddingBottom: 24,
     marginHorizontal: 8,
-    marginBottom: 8,
+    marginBottom: FOOTER_HEIGHT + 8,
   },
   taskFormHeading: {
     color: '#EFEFF4',
