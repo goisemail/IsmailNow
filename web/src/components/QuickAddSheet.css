@@ -71,6 +71,7 @@
   transform: translateY(100%);
   opacity: 0;
   transition: none;
+  margin-bottom: 84px;
 }
 
 .quick-add-sheet.open {
@@ -176,28 +177,28 @@
 /* FAB Button */
 .fab {
   position: fixed;
-  bottom: 90px;
+  bottom: 92px;
   right: 22px;
   width: 62px;
   height: 62px;
-  border-radius: 20px;
-  background: #E72372;
+  border-radius: 50%;
+  background: #FF9500;
   border: none;
   color: white;
   font-size: 34px;
   font-weight: 700;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(231, 35, 114, 0.4);
+  box-shadow: 0 4px 12px rgba(255, 149, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  z-index: 20;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .fab:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 16px rgba(231, 35, 114, 0.5);
+  box-shadow: 0 6px 16px rgba(255, 149, 0, 0.5);
 }
 
 .fab:active {
@@ -236,7 +237,7 @@
   }
 
   .fab {
-    bottom: 80px;
+    bottom: 92px;
     right: 16px;
     width: 56px;
     height: 56px;
