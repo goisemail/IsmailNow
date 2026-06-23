@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useHabitsStore, Habit } from '../store/habits'
 import { useTasksStore } from '../store/tasks'
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatDate } from '../utils/date'
 import './Dashboard.css'
 import QuickAddSheet from '../components/QuickAddSheet'
@@ -138,13 +138,6 @@ export default function Dashboard() {
       <div className="mb-4">
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h2 className="h5 mb-0">Tasks</h2>
-          <button
-            className="btn btn-sm btn-primary"
-            onClick={() => setQuickAddOpen(true)}
-            data-testid="quickAddBtn"
-          >
-            <Plus size={16} /> Quick Add
-          </button>
         </div>
 
         {showTaskForm && (
@@ -204,6 +197,15 @@ export default function Dashboard() {
           {completedTasks.length} of {tasksForDate.length} completed
         </div>
       </div>
+
+      <button
+        className="fab"
+        onClick={() => setQuickAddOpen(true)}
+        aria-label="Quick add"
+        data-testid="fab"
+      >
+        +
+      </button>
 
       <QuickAddSheet
         open={quickAddOpen}

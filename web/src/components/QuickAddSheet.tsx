@@ -92,12 +92,6 @@ export default function QuickAddSheet({
           ))}
         </div>
       </div>
-
-      {open && (
-        <button className="fab" onClick={onClose} data-testid="fab">
-          <span className="fab-icon">+</span>
-        </button>
-      )}
     </>
   )
 }
