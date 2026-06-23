@@ -1,10 +1,16 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useHabitsStore, Habit } from '../store/habits'
 import { useTasksStore } from '../store/tasks'
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
-import { formatDate, getDateRange, formatDateDisplay } from '../utils/date'
+import { formatDate } from '../utils/date'
 import './Dashboard.css'
 import QuickAddSheet from '../components/QuickAddSheet'
+
+interface WeekDay {
+  key: string
+  weekday: string
+  dateLabel: string
+}
 
 export default function Dashboard() {
   const habits = useHabitsStore((state) => state.habits)
@@ -18,18 +24,28 @@ export default function Dashboard() {
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [taskTitle, setTaskTitle] = useState('')
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [weekOffset, setWeekOffset] = useState(0)
 
-  const dateRange = getDateRange(20)
-  const scrollIndex = dateRange.indexOf(selectedDate)
-
-  const handleDateScroll = (direction: 'prev' | 'next') => {
-    const currentIndex = dateRange.indexOf(selectedDate)
-    if (direction === 'prev' && currentIndex > 0) {
-      setSelectedDate(dateRange[currentIndex - 1])
-    } else if (direction === 'next' && currentIndex < dateRange.length - 1) {
-      setSelectedDate(dateRange[currentIndex + 1])
-    }
-  }
+  const weekDays = useMemo<WeekDay[]>(() => {
+    const now = new Date()
+    const todayKey = now.toISOString().slice(0, 10)
+    const [yr, mo, dy] = todayKey.split('-').map(Number)
+    const todayMs = Date.UTC(yr, mo - 1, dy)
+    const dow = new Date(todayMs).getUTCDay() // 0 = Sunday
+    const sundayMs = todayMs - dow * 86400000 + weekOffset * 7 * 86400000
+    return Array.from({length: 7}, (_, i) => {
+      const ms = sundayMs + i * 86400000
+      const d = new Date(ms)
+      const key = d.toISOString().slice(0, 10)
+      const display = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+      const weekday = display.toLocaleDateString('en-US', {weekday: 'long'})
+      const dateLabel = display.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+      })
+      return {key, weekday, dateLabel}
+    })
+  }, [weekOffset])
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault()
@@ -63,39 +79,38 @@ export default function Dashboard() {
         <p className="text-muted mb-0">Track your daily progress</p>
       </div>
 
-      {/* Date Carousel */}
-      <div className="date-carousel mb-4">
+      {/* Week Date Navigator */}
+      <div className="week-row mb-4">
+        {/* Right arrow (→) placed on LEFT side — navigate to next week */}
         <button
-          className="btn btn-outline-secondary btn-sm"
-          onClick={() => handleDateScroll('prev')}
+          className="week-nav-btn"
+          onClick={() => setWeekOffset(w => w + 1)}
+          aria-label="Next week"
         >
-          <ChevronLeft size={20} />
+          <ChevronRight size={22} />
         </button>
 
-        <div className="date-display text-center flex-grow-1">
-          <div className="fs-5 fw-bold">{formatDateDisplay(selectedDate)}</div>
-          <div className="text-muted small">{selectedDate}</div>
+        <div className="week-days-scroll">
+          {weekDays.map(d => (
+            <button
+              key={d.key}
+              className={`week-day-chip ${selectedDate === d.key ? 'active' : ''}`}
+              onClick={() => setSelectedDate(d.key)}
+            >
+              <div className="week-day-label">{d.weekday}</div>
+              <div className="week-date-text">{d.dateLabel}</div>
+            </button>
+          ))}
         </div>
 
+        {/* Left arrow (←) placed on RIGHT side — navigate to previous week */}
         <button
-          className="btn btn-outline-secondary btn-sm"
-          onClick={() => handleDateScroll('next')}
+          className="week-nav-btn"
+          onClick={() => setWeekOffset(w => w - 1)}
+          aria-label="Previous week"
         >
-          <ChevronRight size={20} />
+          <ChevronLeft size={22} />
         </button>
-      </div>
-
-      {/* Quick Date Selector */}
-      <div className="date-chips mb-4">
-        {dateRange.slice(Math.max(0, scrollIndex - 3), Math.min(dateRange.length, scrollIndex + 4)).map((date) => (
-          <button
-            key={date}
-            className={`date-chip ${selectedDate === date ? 'active' : ''}`}
-            onClick={() => setSelectedDate(date)}
-          >
-            {formatDateDisplay(date).split(' ')[0].charAt(0)}
-          </button>
-        ))}
       </div>
 
       {/* Habits Section */}
@@ -161,23 +176,26 @@ export default function Dashboard() {
         {tasksForDate.length === 0 ? (
           <div className="text-muted">No tasks for this date</div>
         ) : (
-          <div className="list-group">
+          <div className="task-list">
             {tasksForDate.map((task) => (
-              <label key={task.id} className="list-group-item d-flex gap-3" data-testid={`task-${task.id}`}>
-                <input
-                  className="form-check-input"
-                  type="checkbox"
-                  checked={task.completedDate === selectedDate}
-                  onChange={() => toggleTaskCompletion(task.id, selectedDate)}
-                />
+              <div key={task.id} className="task-row" data-testid={`task-${task.id}`}>
                 <span
-                  className={`flex-grow-1 ${
-                    task.completedDate === selectedDate ? 'text-decoration-line-through text-muted' : ''
+                  className={`task-title ${
+                    task.completedDate === selectedDate ? 'completed' : ''
                   }`}
                 >
                   {task.title}
                 </span>
-              </label>
+                <button
+                  className={`task-toggle ${
+                    task.completedDate === selectedDate ? 'done' : ''
+                  }`}
+                  onClick={() => toggleTaskCompletion(task.id, selectedDate)}
+                  aria-label={`${task.title} ${task.completedDate === selectedDate ? 'done' : 'pending'}`}
+                >
+                  {task.completedDate === selectedDate && '✓'}
+                </button>
+              </div>
             ))}
           </div>
         )}
