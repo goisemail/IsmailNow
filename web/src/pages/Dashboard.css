@@ -1,13 +1,23 @@
+/* Week Row Wrapper */
+.week-row-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  width: 100%;
+  background: #050507;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
 /* Week Row Container */
 .week-row {
   display: flex;
   align-items: center;
   width: 100%;
   gap: 4px;
-  padding-left: 4px;
-  padding-right: 4px;
-  margin-bottom: 4px;
+  padding: 8px 12px;
   box-sizing: border-box;
+  max-width: 1280px;
+  margin: 0 auto;
 }
 
 .week-nav-btn {

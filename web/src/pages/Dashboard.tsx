@@ -1,8 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import { useHabitsStore, Habit } from '../store/habits'
 import { useTasksStore } from '../store/tasks'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { formatDate } from '../utils/date'
 import './Dashboard.css'
 import QuickAddSheet from '../components/QuickAddSheet'
 
@@ -12,40 +11,98 @@ interface WeekDay {
   dateLabel: string
 }
 
-export default function Dashboard() {
+interface DashboardProps {
+  selectedDate: string
+  setSelectedDate: Dispatch<SetStateAction<string>>
+}
+
+interface WeekNavigatorProps {
+  selectedDate: string
+  setSelectedDate: Dispatch<SetStateAction<string>>
+  weekOffset: number
+  setWeekOffset: Dispatch<SetStateAction<number>>
+}
+
+function getWeekDays(weekOffset: number): WeekDay[] {
+  const now = new Date()
+  const todayKey = now.toISOString().slice(0, 10)
+  const [yr, mo, dy] = todayKey.split('-').map(Number)
+  const todayMs = Date.UTC(yr, mo - 1, dy)
+  const dow = new Date(todayMs).getUTCDay() // 0 = Sunday
+  const sundayMs = todayMs - dow * 86400000 + weekOffset * 7 * 86400000
+  return Array.from({ length: 7 }, (_, i) => {
+    const ms = sundayMs + i * 86400000
+    const d = new Date(ms)
+    const key = d.toISOString().slice(0, 10)
+    const display = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+    const weekday = display.toLocaleDateString('en-US', { weekday: 'short' })
+    const dateLabel = display.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    })
+    return { key, weekday, dateLabel }
+  })
+}
+
+export function DashboardWeekNavigator({
+  selectedDate,
+  setSelectedDate,
+  weekOffset,
+  setWeekOffset,
+}: WeekNavigatorProps) {
+  const weekDays = getWeekDays(weekOffset)
+
+  return (
+    <div className="week-row-wrapper">
+      <div className="week-row">
+        {/* Left arrow (←) — navigate to previous week */}
+        <button
+          className="week-nav-btn"
+          onClick={() => setWeekOffset((w) => w - 1)}
+          aria-label="Previous week"
+        >
+          <ChevronLeft size={20} />
+        </button>
+
+        <div className="week-days-scroll">
+          {weekDays.map((d) => (
+            <button
+              key={d.key}
+              className={`week-day-chip ${selectedDate === d.key ? 'active' : ''}`}
+              onClick={() => setSelectedDate(d.key)}
+            >
+              <div className="week-day-label">{d.weekday}</div>
+              <div className="week-date-text">{d.dateLabel}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Right arrow (→) — navigate to next week */}
+        <button
+          className="week-nav-btn"
+          onClick={() => setWeekOffset((w) => w + 1)}
+          aria-label="Next week"
+        >
+          <ChevronRight size={20} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
+export default function Dashboard({
+  selectedDate,
+  setSelectedDate,
+}: DashboardProps) {
   const habits = useHabitsStore((state) => state.habits)
   const logCompletion = useHabitsStore((state) => state.logCompletion)
   const tasks = useTasksStore((state) => state.tasks)
   const addTask = useTasksStore((state) => state.addTask)
   const toggleTaskCompletion = useTasksStore((state) => state.toggleTaskCompletion)
 
-  const today = formatDate(new Date())
-  const [selectedDate, setSelectedDate] = useState(today)
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [taskTitle, setTaskTitle] = useState('')
   const [quickAddOpen, setQuickAddOpen] = useState(false)
-  const [weekOffset, setWeekOffset] = useState(0)
-
-  const weekDays = useMemo<WeekDay[]>(() => {
-    const now = new Date()
-    const todayKey = now.toISOString().slice(0, 10)
-    const [yr, mo, dy] = todayKey.split('-').map(Number)
-    const todayMs = Date.UTC(yr, mo - 1, dy)
-    const dow = new Date(todayMs).getUTCDay() // 0 = Sunday
-    const sundayMs = todayMs - dow * 86400000 + weekOffset * 7 * 86400000
-    return Array.from({length: 7}, (_, i) => {
-      const ms = sundayMs + i * 86400000
-      const d = new Date(ms)
-      const key = d.toISOString().slice(0, 10)
-      const display = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
-      const weekday = display.toLocaleDateString('en-US', {weekday: 'short'})
-      const dateLabel = display.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-      })
-      return {key, weekday, dateLabel}
-    })
-  }, [weekOffset])
 
   const handleAddTask = (e: React.FormEvent) => {
     e.preventDefault()
@@ -75,45 +132,8 @@ export default function Dashboard() {
   return (
     <div className="dashboard container-lg py-4">
       {/* Header */}
-      <div className="mb-4">
-        <p className="text-muted mb-0">Track your daily progress</p>
-      </div>
 
-      {/* Week Date Navigator */}
-      <div className="week-row mb-4">
-        {/* Left arrow (←) — navigate to previous week */}
-        <button
-          className="week-nav-btn"
-          onClick={() => setWeekOffset(w => w - 1)}
-          aria-label="Previous week"
-        >
-          <ChevronLeft size={20} />
-        </button>
-
-        <div className="week-days-scroll">
-          {weekDays.map(d => (
-            <button
-              key={d.key}
-              className={`week-day-chip ${selectedDate === d.key ? 'active' : ''}`}
-              onClick={() => setSelectedDate(d.key)}
-            >
-              <div className="week-day-label">{d.weekday}</div>
-              <div className="week-date-text">{d.dateLabel}</div>
-            </button>
-          ))}
-        </div>
-
-        {/* Right arrow (→) — navigate to next week */}
-        <button
-          className="week-nav-btn"
-          onClick={() => setWeekOffset(w => w + 1)}
-          aria-label="Next week"
-        >
-          <ChevronRight size={20} />
-        </button>
-      </div>
-
-      {/* Habits Section */}
+        {/* Habits Section */}
       <div className="mb-4">
         <h2 className="h5 mb-3">Habits</h2>
         {habits.length === 0 ? (
