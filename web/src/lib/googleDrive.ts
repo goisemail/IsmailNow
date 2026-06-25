@@ -16,10 +16,52 @@ const DRIVE_FILE_NAME = 'ismailnow_data.json'
 const FILE_ID_KEY = 'ismailnow_drive_file_id'
 let resolveFilePromise: Promise<string> | null = null
 
+interface DriveFileMeta {
+  id: string
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function authHeader(token: string): string {
   return 'Bearer ' + token
+}
+
+async function listDriveDataFiles(token: string): Promise<DriveFileMeta[]> {
+  const searchUrl =
+    'https://www.googleapis.com/drive/v3/files?q=' +
+    encodeURIComponent(
+      "name='" + DRIVE_FILE_NAME + "' and mimeType='application/json' and trashed=false",
+    ) +
+    '&fields=files(id)&orderBy=createdTime asc'
+
+  const searchRes = await fetch(searchUrl, {
+    headers: { Authorization: authHeader(token) },
+  })
+  if (!searchRes.ok) {
+    const text = await searchRes.text()
+    throw new Error('Drive API error ' + searchRes.status + ': ' + text)
+  }
+  const searchJson = (await searchRes.json()) as { files?: DriveFileMeta[] }
+  return searchJson.files ?? []
+}
+
+function parseTasksArray(text: string): PendingTask[] {
+  if (!text.trim()) return []
+  try {
+    const parsed = JSON.parse(text) as unknown
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (item): item is PendingTask =>
+        Boolean(item) &&
+        typeof item === 'object' &&
+        typeof (item as PendingTask).id === 'string' &&
+        typeof (item as PendingTask).title === 'string' &&
+        typeof (item as PendingTask).startDate === 'string' &&
+        typeof (item as PendingTask).createdAt === 'string',
+    )
+  } catch {
+    return []
+  }
 }
 
 // ─── File bootstrap ───────────────────────────────────────────────────────────
@@ -30,30 +72,12 @@ function authHeader(token: string): string {
  * and caches the ID in localStorage.
  */
 export async function getOrCreateDriveFile(token: string): Promise<string> {
-  const cached = localStorage.getItem(FILE_ID_KEY)
-  if (cached) return cached
   if (resolveFilePromise) return resolveFilePromise
 
   resolveFilePromise = (async () => {
-    // Search for an existing file with this name
-    const searchUrl =
-      'https://www.googleapis.com/drive/v3/files?q=' +
-      encodeURIComponent(
-        "name='" + DRIVE_FILE_NAME + "' and mimeType='application/json' and trashed=false",
-      ) +
-      '&fields=files(id,createdTime)&orderBy=createdTime asc'
-
-    const searchRes = await fetch(searchUrl, {
-      headers: { Authorization: authHeader(token) },
-    })
-    if (!searchRes.ok) {
-      const text = await searchRes.text()
-      throw new Error('Drive API error ' + searchRes.status + ': ' + text)
-    }
-    const searchJson = (await searchRes.json()) as { files?: { id: string }[] }
-
-    if (searchJson.files && searchJson.files.length > 0) {
-      const id = searchJson.files[0].id
+    const files = await listDriveDataFiles(token)
+    if (files.length > 0) {
+      const id = files[0].id
       localStorage.setItem(FILE_ID_KEY, id)
       return id
     }
@@ -95,31 +119,40 @@ export async function getOrCreateDriveFile(token: string): Promise<string> {
  * Returns an empty array if the file is missing or its content is invalid.
  */
 export async function loadTasksFromDrive(token: string): Promise<PendingTask[]> {
-  const attemptRead = async (): Promise<Response> => {
-    const fileId = await getOrCreateDriveFile(token)
-    return fetch(
-      'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
-      { headers: { Authorization: authHeader(token) } },
-    )
-  }
-
-  let res = await attemptRead()
-  if (res.status === 404) {
+  let files = await listDriveDataFiles(token)
+  if (files.length === 0) {
     clearDriveCache()
-    res = await attemptRead()
+    await getOrCreateDriveFile(token)
+    files = await listDriveDataFiles(token)
   }
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error('Drive API error ' + res.status + ': ' + text)
+  if (files.length === 0) return []
+
+  localStorage.setItem(FILE_ID_KEY, files[0].id)
+
+  const snapshots = await Promise.all(
+    files.map(async ({ id }) => {
+      const res = await fetch(
+        'https://www.googleapis.com/drive/v3/files/' + id + '?alt=media',
+        { headers: { Authorization: authHeader(token) } },
+      )
+      if (res.status === 404) return [] as PendingTask[]
+      if (!res.ok) {
+        const text = await res.text()
+        throw new Error('Drive API error ' + res.status + ': ' + text)
+      }
+      const text = await res.text()
+      return parseTasksArray(text)
+    }),
+  )
+
+  const byId = new Map<string, PendingTask>()
+  for (const tasks of snapshots) {
+    for (const task of tasks) {
+      byId.set(task.id, task)
+    }
   }
 
-  const text = await res.text()
-  if (!text.trim()) return []
-  try {
-    return JSON.parse(text) as PendingTask[]
-  } catch {
-    return []
-  }
+  return Array.from(byId.values())
 }
 
 /**
