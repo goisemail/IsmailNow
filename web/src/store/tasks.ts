@@ -6,6 +6,7 @@ import { loadTasksFromDrive, saveTasksToDrive } from '../lib/googleDrive'
 export interface PendingTask {
   id: string
   title: string
+  backgroundColor?: string
   startDate: string
   createdAt: string
   completedDate?: string
@@ -48,6 +49,7 @@ interface TasksStore {
 // ─── Storage keys ─────────────────────────────────────────────────────────────
 
 const TASKS_KEY = 'ismailnow_tasks_v1'
+const TASK_COLORS = ['#E7F5FF', '#FFF4E6', '#FFF0F6', '#EBFBEE', '#F8F0FC', '#FFF9DB']
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -72,14 +74,22 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 }
 
+function pickTaskColor(id: string): string {
+  let hash = 0
+  for (let i = 0; i < id.length; i += 1) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0
+  }
+  return TASK_COLORS[hash % TASK_COLORS.length]
+}
+
 /**
  * Determines whether a task should be visible on a given date:
- *   created on or before the date  AND  not yet completed (or completed after the date)
+ *   created on or before the date  AND  not yet completed (or completed on/after the date)
  */
 export function taskVisibleOnDate(task: PendingTask, date: string): boolean {
   return (
     task.startDate <= date &&
-    (!task.completedDate || task.completedDate > date)
+    (!task.completedDate || task.completedDate >= date)
   )
 }
 
@@ -134,6 +144,7 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
     const newTask: PendingTask = {
       id,
       title,
+      backgroundColor: pickTaskColor(id),
       startDate,
       createdAt: new Date().toISOString(),
       synced: false,

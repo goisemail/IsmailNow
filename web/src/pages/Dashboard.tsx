@@ -25,6 +25,17 @@ interface WeekNavigatorProps {
   setWeekOffset: Dispatch<SetStateAction<number>>
 }
 
+function getReadableTextColor(backgroundColor?: string): '#111827' | '#ffffff' {
+  if (!backgroundColor) return '#111827'
+  const hex = backgroundColor.replace('#', '')
+  if (!/^[0-9a-fA-F]{6}$/.test(hex)) return '#111827'
+  const r = parseInt(hex.slice(0, 2), 16)
+  const g = parseInt(hex.slice(2, 4), 16)
+  const b = parseInt(hex.slice(4, 6), 16)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.62 ? '#111827' : '#ffffff'
+}
+
 function getWeekDays(weekOffset: number): WeekDay[] {
   const now = new Date()
   const todayKey = now.toISOString().slice(0, 10)
@@ -175,9 +186,18 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
           <div className="task-list">
             {tasksForDate.map((task) => {
               const isCompleted = task.completedDate === selectedDate
+              const titleColor = getReadableTextColor(task.backgroundColor)
               return (
-                <div key={task.id} className="task-row" data-testid={'task-' + task.id}>
-                  <span className={'task-title' + (isCompleted ? ' completed' : '')}>
+                <div
+                  key={task.id}
+                  className="task-row"
+                  style={{ backgroundColor: task.backgroundColor ?? '#f8f9fa' }}
+                  data-testid={'task-' + task.id}
+                >
+                  <span
+                    className={'task-title' + (isCompleted ? ' completed' : '')}
+                    style={{ color: isCompleted ? '#6c757d' : titleColor }}
+                  >
                     {task.title}
                     {!task.synced && (
                       <span className="task-offline-badge" title="Pending sync">●</span>
