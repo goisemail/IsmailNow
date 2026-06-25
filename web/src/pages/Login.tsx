@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import './Login.css'
 
 export default function Login() {
-  const { user, loading, signIn } = useAuth()
+  const { user, loading, signIn, signInGuest } = useAuth()
   const navigate = useNavigate()
 
   // If already signed in, go to the dashboard
@@ -56,8 +56,16 @@ export default function Login() {
           Sign in with Google
         </button>
 
+        <button
+          className="login-guest-btn"
+          onClick={signInGuest}
+          data-testid="guestSignInBtn"
+        >
+          Continue as Guest
+        </button>
+
         <p className="login-privacy">
-          We never see your data. Tasks are stored in a spreadsheet in your own Google Drive.
+          Google sign-in stores tasks in your Drive. Guest mode stores only on this device.
         </p>
       </div>
     </div>

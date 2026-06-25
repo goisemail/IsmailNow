@@ -33,6 +33,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function AppContent() {
   const loadHabits = useHabitsStore((state) => state.load)
   const loadTasks = useTasksStore((state) => state.load)
+  const syncWithDrive = useTasksStore((state) => state.syncWithDrive)
 
   const { user } = useAuth()
   const isOnline = useOnlineStatus()
@@ -41,6 +42,7 @@ function AppContent() {
   useDriveSync()
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()))
   const [weekOffset, setWeekOffset] = useState(0)
   const location = useLocation()
@@ -50,6 +52,25 @@ function AppContent() {
     loadHabits()
     loadTasks()
   }, [])
+
+  const handleManualSync = async () => {
+    if (!user?.accessToken) {
+      alert('Cloud sync is available only when signed in with Google.')
+      return
+    }
+    if (syncing) return
+
+    setSyncing(true)
+    try {
+      await syncWithDrive(user.accessToken)
+      alert('Cloud sync completed.')
+      setSidebarOpen(false)
+    } catch {
+      alert('Cloud sync failed. Please try again.')
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   return (
     <div className="app-wrapper">
@@ -70,17 +91,23 @@ function AppContent() {
           &#9776;
         </button>
         <span className="app-header-title">Ismail Now</span>
-        {user && (
+        {user && !user.isGuest && user.photoUrl && (
           <img
             src={user.photoUrl}
             alt={user.name}
             className="app-header-avatar"
-            title={user.name + ' — ' + user.email}
+            title={user.email ? user.name + ' — ' + user.email : user.name}
           />
         )}
       </header>
 
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onSyncToCloud={handleManualSync}
+        syncing={syncing}
+        canSync={Boolean(user?.accessToken)}
+      />
 
       {location.pathname === '/' && (
         <DashboardWeekNavigator

@@ -78,6 +78,25 @@
   transform: translateY(0);
 }
 
+.login-guest-btn {
+  width: 100%;
+  padding: 12px 20px;
+  background: #f1f3f5;
+  border: 1px solid #ced4da;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #343a40;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 20px;
+}
+
+.login-guest-btn:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
 .login-google-icon {
   width: 22px;
   height: 22px;
@@ -118,5 +137,16 @@
 
   .login-google-btn:hover {
     border-color: #E72372;
+  }
+
+  .login-guest-btn {
+    background: #2d2d3a;
+    border-color: #495057;
+    color: #f8f9fa;
+  }
+
+  .login-guest-btn:hover {
+    background: #343444;
+    border-color: #6c757d;
   }
 }

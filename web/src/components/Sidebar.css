@@ -101,3 +101,12 @@
   color: #e72372;
   text-decoration: none;
 }
+
+.sidebar-sync-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.sidebar-sync-btn:disabled:hover {
+  color: #c8cad0;
+}

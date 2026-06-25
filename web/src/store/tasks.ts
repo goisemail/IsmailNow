@@ -44,6 +44,8 @@ interface TasksStore {
    * Called periodically by the useDriveSync hook and on tab hide / sign-out.
    */
   flushToDrive: (token: string) => Promise<void>
+  /** Manual bi-directional sync: merge local+Drive and persist merged result to both. */
+  syncWithDrive: (token: string) => Promise<void>
 }
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
@@ -82,6 +84,54 @@ function pickTaskColor(id: string): string {
   return TASK_COLORS[hash % TASK_COLORS.length]
 }
 
+function normalizeTask(task: PendingTask): PendingTask {
+  return {
+    ...task,
+    backgroundColor: task.backgroundColor ?? pickTaskColor(task.id),
+  }
+}
+
+function mergeTaskPair(base: PendingTask, incoming: PendingTask): PendingTask {
+  // Prefer local unsynced changes over remote snapshot when both share the same id.
+  if (incoming.synced === false && base.synced !== false) {
+    return normalizeTask({ ...base, ...incoming })
+  }
+  if (base.synced === false && incoming.synced !== false) {
+    return normalizeTask({ ...incoming, ...base })
+  }
+  // If both are unsynced or both synced, preserve completion when either side has it.
+  const completedDate =
+    base.completedDate && incoming.completedDate
+      ? (base.completedDate > incoming.completedDate ? base.completedDate : incoming.completedDate)
+      : (base.completedDate ?? incoming.completedDate)
+  return normalizeTask({
+    ...base,
+    ...incoming,
+    completedDate,
+    synced: base.synced && incoming.synced,
+  })
+}
+
+function mergeTasks(localTasks: PendingTask[], driveTasks: PendingTask[]): PendingTask[] {
+  const byId = new Map<string, PendingTask>()
+
+  for (const task of driveTasks) {
+    byId.set(task.id, normalizeTask({ ...task, synced: true }))
+  }
+
+  for (const task of localTasks) {
+    const localTask = normalizeTask(task)
+    const existing = byId.get(localTask.id)
+    if (!existing) {
+      byId.set(localTask.id, localTask)
+      continue
+    }
+    byId.set(localTask.id, mergeTaskPair(existing, localTask))
+  }
+
+  return Array.from(byId.values()).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+}
+
 /**
  * Determines whether a task should be visible on a given date:
  *   created on or before the date  AND  not yet completed (or completed on/after the date)
@@ -101,7 +151,7 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
   error: null,
 
   load: () => {
-    set({ tasks: loadFromStorage() })
+    set({ tasks: loadFromStorage().map(normalizeTask) })
   },
 
   fetchForDate: async (_date, token) => {
@@ -109,20 +159,8 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
     try {
       if (token) {
         const driveTasks = await loadTasksFromDrive(token)
-        // Mark all Drive tasks as synced
-        const fromDrive: PendingTask[] = driveTasks.map((t) => ({ ...t, synced: true }))
-
-        // Preserve any local un-synced tasks not yet in Drive
         const localTasks = loadFromStorage()
-        const unsynced = localTasks.filter((t) => !t.synced)
-
-        // Merge: Drive is the source of truth for synced tasks
-        const merged = [...fromDrive]
-        for (const local of unsynced) {
-          if (!merged.find((t) => t.id === local.id)) {
-            merged.push(local)
-          }
-        }
+        const merged = mergeTasks(localTasks, driveTasks)
 
         saveToStorage(merged)
         set({ tasks: merged, loading: false })
@@ -198,6 +236,22 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
       })
     } catch (err) {
       console.error('flushToDrive failed:', err)
+    }
+  },
+
+  syncWithDrive: async (token) => {
+    set({ loading: true, error: null })
+    try {
+      const driveTasks = await loadTasksFromDrive(token)
+      const localTasks = loadFromStorage()
+      const merged = mergeTasks(localTasks, driveTasks).map((task) => ({ ...task, synced: true }))
+      await saveTasksToDrive(token, merged)
+      saveToStorage(merged)
+      set({ tasks: merged, loading: false })
+    } catch (err) {
+      console.error('syncWithDrive failed:', err)
+      set({ loading: false, error: 'Cloud sync failed' })
+      throw err
     }
   },
 }))

@@ -3,18 +3,20 @@ import { clearDriveCache } from '../lib/googleDrive'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export interface GoogleUser {
+export interface AppUser {
   uid: string        // Google sub (unique user id)
-  email: string
+  email?: string
   name: string
-  photoUrl: string
-  accessToken: string
+  photoUrl?: string
+  accessToken?: string
+  isGuest?: boolean
 }
 
 interface AuthContextValue {
-  user: GoogleUser | null
+  user: AppUser | null
   loading: boolean
   signIn: () => void
+  signInGuest: () => void
   signOut: () => void
 }
 
@@ -40,7 +42,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 // ─── Provider ─────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<GoogleUser | null>(null)
+  const [user, setUser] = useState<AppUser | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Restore session from localStorage on mount
@@ -48,7 +50,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const stored = localStorage.getItem(USER_KEY)
       if (stored) {
-        setUser(JSON.parse(stored) as GoogleUser)
+        setUser(JSON.parse(stored) as AppUser)
       }
     } catch {
       // Corrupted storage — ignore
@@ -95,12 +97,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           picture: string
         }
 
-        const newUser: GoogleUser = {
+        const newUser: AppUser = {
           uid: profile.sub,
           email: profile.email,
           name: profile.name,
           photoUrl: profile.picture,
           accessToken,
+          isGuest: false,
         }
 
         localStorage.setItem(USER_KEY, JSON.stringify(newUser))
@@ -111,6 +114,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     client.requestAccessToken()
   }
 
+  const signInGuest = () => {
+    const guest: AppUser = {
+      uid: 'guest',
+      name: 'Guest',
+      isGuest: true,
+    }
+    localStorage.setItem(USER_KEY, JSON.stringify(guest))
+    clearDriveCache()
+    setUser(guest)
+  }
+
   const signOut = () => {
     localStorage.removeItem(USER_KEY)
     clearDriveCache()
@@ -118,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signInGuest, signOut }}>
       {children}
     </AuthContext.Provider>
   )
