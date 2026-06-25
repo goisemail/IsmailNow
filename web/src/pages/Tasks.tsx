@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTasksStore, PendingTask } from '../store/tasks'
+import { useAuth } from '../contexts/AuthContext'
 import { Plus, Trash2 } from 'lucide-react'
 import { formatDate } from '../utils/date'
 import './Tasks.css'
@@ -7,8 +8,12 @@ import './Tasks.css'
 export default function Tasks() {
   const tasks = useTasksStore((state) => state.tasks)
   const addTask = useTasksStore((state) => state.addTask)
-  const toggleTaskCompletion = useTasksStore((state) => state.toggleTaskCompletion)
+  const markComplete = useTasksStore((state) => state.markComplete)
+  const unmarkComplete = useTasksStore((state) => state.unmarkComplete)
   const deleteTask = useTasksStore((state) => state.deleteTask)
+
+  const { user } = useAuth()
+  const token = user?.accessToken ?? null
 
   const today = formatDate(new Date())
 
@@ -19,10 +24,18 @@ export default function Tasks() {
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault()
     if (taskTitle.trim()) {
-      addTask(taskTitle.trim(), taskDate)
+      addTask(taskTitle.trim(), taskDate, token)
       setTaskTitle('')
       setTaskDate(today)
       setShowForm(false)
+    }
+  }
+
+  const handleToggle = (task: PendingTask) => {
+    if (task.completedDate) {
+      unmarkComplete(task.id, token)
+    } else {
+      markComplete(task.id, today, token)
     }
   }
 
@@ -98,7 +111,7 @@ export default function Tasks() {
                     key={task.id}
                     task={task}
                     today={today}
-                    onToggle={() => toggleTaskCompletion(task.id, today)}
+                    onToggle={() => handleToggle(task)}
                     onDelete={() => deleteTask(task.id)}
                   />
                 ))}
@@ -115,7 +128,7 @@ export default function Tasks() {
                     key={task.id}
                     task={task}
                     today={today}
-                    onToggle={() => toggleTaskCompletion(task.id, task.completedDate!)}
+                    onToggle={() => handleToggle(task)}
                     onDelete={() => deleteTask(task.id)}
                   />
                 ))}
