@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { appendTask, markTaskComplete, fetchTasksForDate } from '../lib/googleSheets'
+import { loadTasksFromDrive, saveTasksToDrive } from '../lib/googleDrive'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -10,17 +10,10 @@ export interface PendingTask {
   createdAt: string
   completedDate?: string
   /**
-   * true  = this task has been written to the user's Google Sheet.
-   * false = offline or failed; sitting in the local sync queue.
+   * true  = this task has been flushed to the user's Drive file.
+   * false = only in localStorage; will be included in the next Drive flush.
    */
   synced: boolean
-}
-
-interface SyncOp {
-  op: 'add' | 'complete'
-  taskId: string
-  date?: string           // populated for 'complete' ops
-  timestamp: string
 }
 
 interface TasksStore {
@@ -30,11 +23,11 @@ interface TasksStore {
   /** Load tasks from localStorage into memory (called on app start). */
   load: () => void
   /**
-   * Fetch tasks for a given date from Google Sheets and merge with local
-   * un-synced tasks. Falls back to local-only when offline or unauthenticated.
+   * Load tasks from Drive and merge with any local un-synced tasks.
+   * Falls back to local-only when offline or unauthenticated.
    */
   fetchForDate: (date: string, token: string | null) => Promise<void>
-  /** Add a task — writes locally immediately, syncs online if possible. */
+  /** Add a task — writes to localStorage immediately; Drive flush is periodic. */
   addTask: (title: string, startDate: string, token: string | null) => Promise<void>
   /**
    * Mark a task complete on `date`. The task will no longer appear on future
@@ -43,18 +36,18 @@ interface TasksStore {
   markComplete: (id: string, date: string, token: string | null) => Promise<void>
   /** Undo a completion (toggle off). */
   unmarkComplete: (id: string, token: string | null) => void
-  /** Delete a task locally (Google Sheet row stays; cleanup is manual for now). */
+  /** Delete a task locally; the next Drive flush will propagate the deletion. */
   deleteTask: (id: string) => void
   /**
-   * Drain the offline sync queue. Call this when the network comes back online.
+   * Upload the full task list to Drive.
+   * Called periodically by the useDriveSync hook and on tab hide / sign-out.
    */
-  syncPending: (token: string) => Promise<void>
+  flushToDrive: (token: string) => Promise<void>
 }
 
 // ─── Storage keys ─────────────────────────────────────────────────────────────
 
 const TASKS_KEY = 'ismailnow_tasks_v1'
-const QUEUE_KEY = 'ismailnow_sync_queue_v1'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -73,34 +66,6 @@ function saveToStorage(tasks: PendingTask[]): void {
   } catch {
     // Storage full — ignore
   }
-}
-
-function loadQueue(): SyncOp[] {
-  try {
-    const raw = localStorage.getItem(QUEUE_KEY)
-    return raw ? (JSON.parse(raw) as SyncOp[]) : []
-  } catch {
-    return []
-  }
-}
-
-function saveQueue(queue: SyncOp[]): void {
-  try {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue))
-  } catch {
-    // ignore
-  }
-}
-
-function enqueue(op: SyncOp): void {
-  const queue = loadQueue()
-  queue.push(op)
-  saveQueue(queue)
-}
-
-function dequeue(taskId: string, op: SyncOp['op']): void {
-  const queue = loadQueue().filter((q) => !(q.taskId === taskId && q.op === op))
-  saveQueue(queue)
 }
 
 function generateId(): string {
@@ -129,27 +94,20 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
     set({ tasks: loadFromStorage() })
   },
 
-  fetchForDate: async (date, token) => {
+  fetchForDate: async (_date, token) => {
     set({ loading: true, error: null })
     try {
       if (token) {
-        const sheetTasks = await fetchTasksForDate(token, date)
-        // Convert SheetTask → PendingTask and merge with un-synced local tasks
-        const fromSheet: PendingTask[] = sheetTasks.map((t) => ({
-          id: t.id,
-          title: t.title,
-          startDate: t.startDate,
-          createdAt: t.createdAt,
-          completedDate: t.completedDate || undefined,
-          synced: true,
-        }))
+        const driveTasks = await loadTasksFromDrive(token)
+        // Mark all Drive tasks as synced
+        const fromDrive: PendingTask[] = driveTasks.map((t) => ({ ...t, synced: true }))
 
-        // Preserve any local un-synced tasks not yet in the sheet
+        // Preserve any local un-synced tasks not yet in Drive
         const localTasks = loadFromStorage()
         const unsynced = localTasks.filter((t) => !t.synced)
 
-        // Merge: sheet is the source of truth for synced tasks
-        const merged = [...fromSheet]
+        // Merge: Drive is the source of truth for synced tasks
+        const merged = [...fromDrive]
         for (const local of unsynced) {
           if (!merged.find((t) => t.id === local.id)) {
             merged.push(local)
@@ -167,11 +125,11 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
       console.error('fetchForDate failed:', err)
       // Fall back to local storage so UI is never empty
       const local = loadFromStorage()
-      set({ tasks: local, loading: false, error: 'Could not reach Google Sheets' })
+      set({ tasks: local, loading: false, error: 'Could not reach Google Drive' })
     }
   },
 
-  addTask: async (title, startDate, token) => {
+  addTask: async (title, startDate, _token) => {
     const id = generateId()
     const newTask: PendingTask = {
       id,
@@ -181,74 +139,32 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
       synced: false,
     }
 
-    // 1. Write locally immediately for instant UI
+    // Write locally immediately for instant UI; Drive flush is periodic
     set((state) => {
       const updated = [...state.tasks, newTask]
       saveToStorage(updated)
       return { tasks: updated }
     })
-
-    // 2. Try to sync right now if online
-    if (token) {
-      try {
-        await appendTask(token, {
-          id: newTask.id,
-          title: newTask.title,
-          startDate: newTask.startDate,
-          createdAt: newTask.createdAt,
-          completedDate: '',
-        })
-        // Mark synced in local storage
-        set((state) => {
-          const updated = state.tasks.map((t) =>
-            t.id === id ? { ...t, synced: true } : t,
-          )
-          saveToStorage(updated)
-          return { tasks: updated }
-        })
-      } catch {
-        // Network failed — enqueue for later
-        enqueue({ op: 'add', taskId: id, timestamp: new Date().toISOString() })
-      }
-    } else {
-      // Offline — enqueue
-      enqueue({ op: 'add', taskId: id, timestamp: new Date().toISOString() })
-    }
   },
 
-  markComplete: async (id, date, token) => {
-    // 1. Update locally
+  markComplete: async (id, date, _token) => {
     set((state) => {
       const updated = state.tasks.map((t) =>
-        t.id === id ? { ...t, completedDate: date } : t,
+        t.id === id ? { ...t, completedDate: date, synced: false } : t,
       )
       saveToStorage(updated)
       return { tasks: updated }
     })
-
-    // 2. Sync to sheet if possible
-    if (token) {
-      try {
-        await markTaskComplete(token, id, date)
-        dequeue(id, 'complete')
-      } catch {
-        enqueue({ op: 'complete', taskId: id, date, timestamp: new Date().toISOString() })
-      }
-    } else {
-      enqueue({ op: 'complete', taskId: id, date, timestamp: new Date().toISOString() })
-    }
   },
 
   unmarkComplete: (id, _token) => {
     set((state) => {
       const updated = state.tasks.map((t) =>
-        t.id === id ? { ...t, completedDate: undefined } : t,
+        t.id === id ? { ...t, completedDate: undefined, synced: false } : t,
       )
       saveToStorage(updated)
       return { tasks: updated }
     })
-    // Note: un-completing is a local-only action in this version.
-    // If needed, a full sheet re-scan to clear column E can be added later.
   },
 
   deleteTask: (id) => {
@@ -259,43 +175,18 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
     })
   },
 
-  syncPending: async (token) => {
-    const queue = loadQueue()
-    if (queue.length === 0) return
-
+  flushToDrive: async (token) => {
     const tasks = get().tasks
-    const remaining: SyncOp[] = []
-
-    for (const op of queue) {
-      const task = tasks.find((t) => t.id === op.taskId)
-      if (!task) continue // task was deleted locally — skip
-
-      try {
-        if (op.op === 'add') {
-          await appendTask(token, {
-            id: task.id,
-            title: task.title,
-            startDate: task.startDate,
-            createdAt: task.createdAt,
-            completedDate: task.completedDate ?? '',
-          })
-          // Mark synced
-          set((state) => {
-            const updated = state.tasks.map((t) =>
-              t.id === task.id ? { ...t, synced: true } : t,
-            )
-            saveToStorage(updated)
-            return { tasks: updated }
-          })
-        } else if (op.op === 'complete' && op.date) {
-          await markTaskComplete(token, task.id, op.date)
-        }
-      } catch {
-        // Keep failed ops in the queue for the next sync attempt
-        remaining.push(op)
-      }
+    try {
+      await saveTasksToDrive(token, tasks)
+      // Mark all tasks as synced after a successful flush
+      set((state) => {
+        const updated = state.tasks.map((t) => ({ ...t, synced: true }))
+        saveToStorage(updated)
+        return { tasks: updated }
+      })
+    } catch (err) {
+      console.error('flushToDrive failed:', err)
     }
-
-    saveQueue(remaining)
   },
 }))

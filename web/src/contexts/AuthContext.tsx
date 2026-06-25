@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { clearSheetCache } from '../lib/googleSheets'
+import { clearDriveCache } from '../lib/googleDrive'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,13 +26,11 @@ const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string
 // Google OAuth scopes:
 //   openid + email + profile   → basic identity
 //   drive.file                 → read/write only files this app created
-//   spreadsheets               → read/write those spreadsheets
 const SCOPES = [
   'openid',
   'email',
   'profile',
   'https://www.googleapis.com/auth/drive.file',
-  'https://www.googleapis.com/auth/spreadsheets',
 ].join(' ')
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -115,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = () => {
     localStorage.removeItem(USER_KEY)
-    clearSheetCache()
+    clearDriveCache()
     setUser(null)
   }
 

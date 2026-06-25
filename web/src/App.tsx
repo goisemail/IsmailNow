@@ -4,6 +4,7 @@ import { useHabitsStore } from './store/habits'
 import { useTasksStore } from './store/tasks'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { useOnlineStatus } from './hooks/useOnlineStatus'
+import { useDriveSync } from './hooks/useDriveSync'
 import Navigation from './components/Navigation'
 import Sidebar from './components/Sidebar'
 import Dashboard, { DashboardWeekNavigator } from './pages/Dashboard'
@@ -32,10 +33,12 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function AppContent() {
   const loadHabits = useHabitsStore((state) => state.load)
   const loadTasks = useTasksStore((state) => state.load)
-  const syncPending = useTasksStore((state) => state.syncPending)
 
   const { user } = useAuth()
   const isOnline = useOnlineStatus()
+
+  // Set up periodic Drive flush, visibilitychange, and online-recovery flush
+  useDriveSync()
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()))
@@ -47,13 +50,6 @@ function AppContent() {
     loadHabits()
     loadTasks()
   }, [])
-
-  // Auto-sync the offline queue whenever the network comes back online
-  useEffect(() => {
-    if (isOnline && user?.accessToken) {
-      syncPending(user.accessToken).catch(console.error)
-    }
-  }, [isOnline, user?.accessToken])
 
   return (
     <div className="app-wrapper">
