@@ -49,16 +49,78 @@ function parseTasksArray(text: string): PendingTask[] {
   if (!text.trim()) return []
   try {
     const parsed = JSON.parse(text) as unknown
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter(
-      (item): item is PendingTask =>
-        Boolean(item) &&
-        typeof item === 'object' &&
-        typeof (item as PendingTask).id === 'string' &&
-        typeof (item as PendingTask).title === 'string' &&
-        typeof (item as PendingTask).startDate === 'string' &&
-        typeof (item as PendingTask).createdAt === 'string',
-    )
+    let candidates: unknown[] = []
+    if (Array.isArray(parsed)) {
+      candidates = parsed
+    } else if (parsed && typeof parsed === 'object') {
+      const wrapped = parsed as { tasks?: unknown[]; data?: { tasks?: unknown[] } }
+      if (Array.isArray(wrapped.tasks)) {
+        candidates = wrapped.tasks
+      } else if (Array.isArray(wrapped.data?.tasks)) {
+        candidates = wrapped.data.tasks
+      }
+    }
+
+    const normalizeDate = (value: unknown): string | undefined => {
+      if (typeof value !== 'string') return undefined
+      const ymd = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : value.slice(0, 10)
+      return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : undefined
+    }
+
+    const fallbackId = (title: string, startDate: string, createdAt: string, index: number): string => {
+      const seed = title + '|' + startDate + '|' + createdAt + '|' + index
+      let hash = 0
+      for (let i = 0; i < seed.length; i += 1) {
+        hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
+      }
+      return 'legacy_' + hash.toString(36)
+    }
+
+    return candidates.flatMap((item, index) => {
+      if (!item || typeof item !== 'object') return []
+
+      const raw = item as Record<string, unknown>
+      const title = typeof raw.title === 'string'
+        ? raw.title
+        : (typeof raw.name === 'string' ? raw.name : undefined)
+      if (!title) return []
+
+      const createdAt =
+        typeof raw.createdAt === 'string'
+          ? raw.createdAt
+          : (
+              typeof raw.created === 'string'
+                ? raw.created
+                : new Date().toISOString()
+            )
+
+      const startDate =
+        normalizeDate(raw.startDate) ??
+        normalizeDate(raw.date) ??
+        normalizeDate(createdAt) ??
+        new Date().toISOString().slice(0, 10)
+
+      const completedDate =
+        normalizeDate(raw.completedDate) ??
+        normalizeDate(raw.completedAt) ??
+        normalizeDate(raw.doneDate)
+
+      const normalized: PendingTask = {
+        id:
+          typeof raw.id === 'string' && raw.id.trim().length > 0
+            ? raw.id
+            : fallbackId(title, startDate, createdAt, index),
+        title,
+        startDate,
+        createdAt: typeof createdAt === 'string' ? createdAt : new Date().toISOString(),
+        synced: true,
+      }
+
+      if (typeof raw.backgroundColor === 'string') normalized.backgroundColor = raw.backgroundColor
+      if (completedDate) normalized.completedDate = completedDate
+
+      return [normalized]
+    })
   } catch {
     return []
   }
