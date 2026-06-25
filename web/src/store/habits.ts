@@ -21,30 +21,6 @@ interface HabitsStore {
 
 const STORAGE_KEY = 'habbitnow_habits_v1'
 
-const SEED_HABITS: Habit[] = [
-  {
-    id: 'h1',
-    name: 'Morning Run',
-    color: '#10B981',
-    progress: 0.42,
-    streak: 5,
-  },
-  {
-    id: 'h2',
-    name: 'Read 20m',
-    color: '#F59E0B',
-    progress: 0.75,
-    streak: 12,
-  },
-  {
-    id: 'h3',
-    name: 'Water Intake',
-    color: '#3B82F6',
-    progress: 0.25,
-    streak: 3,
-  },
-]
-
 export const useHabitsStore = create<HabitsStore>((set) => ({
   habits: [],
 
@@ -55,13 +31,11 @@ export const useHabitsStore = create<HabitsStore>((set) => ({
         const parsed = JSON.parse(stored)
         set({ habits: parsed })
       } else {
-        // Seed data on first load
-        set({ habits: SEED_HABITS })
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(SEED_HABITS))
+        set({ habits: [] })
       }
     } catch (error) {
       console.error('Failed to load habits:', error)
-      set({ habits: SEED_HABITS })
+      set({ habits: [] })
     }
   },
 

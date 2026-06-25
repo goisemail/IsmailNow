@@ -4,9 +4,12 @@ import './Sidebar.css'
 interface SidebarProps {
   open: boolean
   onClose: () => void
+  onSyncToCloud: () => void
+  syncing: boolean
+  canSync: boolean
 }
 
-export default function Sidebar({ open, onClose }: SidebarProps) {
+export default function Sidebar({ open, onClose, onSyncToCloud, syncing, canSync }: SidebarProps) {
   const now = new Date()
   const weekday = now.toLocaleDateString('en-US', { weekday: 'long' })
   const dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -45,6 +48,13 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         <span className="sidebar-item">Premium</span>
         <span className="sidebar-item">Rate this app</span>
         <span className="sidebar-item">Contact us</span>
+        <button
+          className="sidebar-item sidebar-sync-btn"
+          onClick={onSyncToCloud}
+          disabled={!canSync || syncing}
+        >
+          {syncing ? 'Syncing…' : 'Sync to Cloud'}
+        </button>
       </div>
     </>
   )

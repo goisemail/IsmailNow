@@ -1,9 +1,12 @@
-import { useState, type Dispatch, type SetStateAction } from 'react'
+import { useState, useEffect, type Dispatch, type SetStateAction } from 'react'
 import { useHabitsStore, Habit } from '../store/habits'
-import { useTasksStore } from '../store/tasks'
+import { useTasksStore, taskVisibleOnDate } from '../store/tasks'
+import { useAuth } from '../contexts/AuthContext'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import './Dashboard.css'
 import QuickAddSheet from '../components/QuickAddSheet'
+import TaskWizard from '../components/TaskWizard'
+import { getReadableTextColor } from '../utils/color'
 
 interface WeekDay {
   key: string
@@ -28,7 +31,7 @@ function getWeekDays(weekOffset: number): WeekDay[] {
   const todayKey = now.toISOString().slice(0, 10)
   const [yr, mo, dy] = todayKey.split('-').map(Number)
   const todayMs = Date.UTC(yr, mo - 1, dy)
-  const dow = new Date(todayMs).getUTCDay() // 0 = Sunday
+  const dow = new Date(todayMs).getUTCDay()
   const sundayMs = todayMs - dow * 86400000 + weekOffset * 7 * 86400000
   return Array.from({ length: 7 }, (_, i) => {
     const ms = sundayMs + i * 86400000
@@ -36,10 +39,7 @@ function getWeekDays(weekOffset: number): WeekDay[] {
     const key = d.toISOString().slice(0, 10)
     const display = new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
     const weekday = display.toLocaleDateString('en-US', { weekday: 'short' })
-    const dateLabel = display.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    })
+    const dateLabel = display.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     return { key, weekday, dateLabel }
   })
 }
@@ -55,7 +55,6 @@ export function DashboardWeekNavigator({
   return (
     <div className="week-row-wrapper">
       <div className="week-row">
-        {/* Left arrow (←) — navigate to previous week */}
         <button
           className="week-nav-btn"
           onClick={() => setWeekOffset((w) => w - 1)}
@@ -68,7 +67,7 @@ export function DashboardWeekNavigator({
           {weekDays.map((d) => (
             <button
               key={d.key}
-              className={`week-day-chip ${selectedDate === d.key ? 'active' : ''}`}
+              className={'week-day-chip' + (selectedDate === d.key ? ' active' : '')}
               onClick={() => setSelectedDate(d.key)}
             >
               <div className="week-day-label">{d.weekday}</div>
@@ -77,7 +76,6 @@ export function DashboardWeekNavigator({
           ))}
         </div>
 
-        {/* Right arrow (→) — navigate to next week */}
         <button
           className="week-nav-btn"
           onClick={() => setWeekOffset((w) => w + 1)}
@@ -90,56 +88,61 @@ export function DashboardWeekNavigator({
   )
 }
 
-export default function Dashboard({
-  selectedDate,
-  setSelectedDate,
-}: DashboardProps) {
-  // setSelectedDate is used in DashboardWeekNavigator component
-  // The actual usage is in DashboardWeekNavigator where it's passed as a prop
-  // but TypeScript doesn't recognize this cross-component usage
-  // We reference it to prevent TS6133 error
-  setSelectedDate; // Reference to prevent unused variable error
-  
+export default function Dashboard({ selectedDate }: DashboardProps) {
   const habits = useHabitsStore((state) => state.habits)
   const logCompletion = useHabitsStore((state) => state.logCompletion)
+
   const tasks = useTasksStore((state) => state.tasks)
+  const loading = useTasksStore((state) => state.loading)
+  const fetchForDate = useTasksStore((state) => state.fetchForDate)
   const addTask = useTasksStore((state) => state.addTask)
-  const toggleTaskCompletion = useTasksStore((state) => state.toggleTaskCompletion)
+  const markComplete = useTasksStore((state) => state.markComplete)
+  const unmarkComplete = useTasksStore((state) => state.unmarkComplete)
 
-  const [showTaskForm, setShowTaskForm] = useState(false)
-  const [taskTitle, setTaskTitle] = useState('')
+  const { user } = useAuth()
+  const token = user?.accessToken ?? null
+
   const [quickAddOpen, setQuickAddOpen] = useState(false)
+  const [taskWizardOpen, setTaskWizardOpen] = useState(false)
 
-  const handleAddTask = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (taskTitle.trim()) {
-      addTask(taskTitle, selectedDate)
-      setTaskTitle('')
-      setShowTaskForm(false)
-    }
-  }
+  // Fetch tasks from Google Sheets whenever the selected date changes
+  useEffect(() => {
+    fetchForDate(selectedDate, token)
+  }, [selectedDate, token])
 
   const handleQuickAddHabit = () => {
     window.location.href = '/habit/new'
   }
 
   const handleQuickAddTask = () => {
-    setShowTaskForm(true)
+    setQuickAddOpen(false)
+    setTaskWizardOpen(true)
   }
 
   const handleQuickAddPriority = () => {
-    // Priority is similar to task for now
-    setShowTaskForm(true)
+    setQuickAddOpen(false)
+    setTaskWizardOpen(true)
   }
 
-  const tasksForDate = tasks.filter((task) => task.startDate === selectedDate)
-  const completedTasks = tasksForDate.filter((task) => task.completedDate === selectedDate)
+  const handleSaveTask = async (taskName: string) => {
+    await addTask(taskName, selectedDate, token)
+  }
+
+  const handleToggle = (taskId: string, isCompleted: boolean) => {
+    if (isCompleted) {
+      unmarkComplete(taskId, token)
+    } else {
+      markComplete(taskId, selectedDate, token)
+    }
+  }
+
+  // Apply the date-range visibility rule
+  const tasksForDate = tasks.filter((t) => taskVisibleOnDate(t, selectedDate))
+  const completedTasks = tasksForDate.filter((t) => t.completedDate === selectedDate)
 
   return (
     <div className="dashboard container-lg py-4">
-      {/* Header */}
-
-        {/* Habits Section */}
+      {/* Habits Section */}
       <div className="mb-4">
         <h2 className="h5 mb-3">Habits</h2>
         {habits.length === 0 ? (
@@ -164,58 +167,42 @@ export default function Dashboard({
       <div className="mb-4">
         <div className="d-flex justify-content-between align-items-center mb-3">
           <h2 className="h5 mb-0">Tasks</h2>
+          {loading && <span className="spinner-border spinner-border-sm text-secondary" role="status" />}
         </div>
-
-        {showTaskForm && (
-          <form onSubmit={handleAddTask} className="mb-3">
-            <div className="input-group">
-              <input
-                type="text"
-                className="form-control"
-                placeholder="Task title..."
-                value={taskTitle}
-                onChange={(e) => setTaskTitle(e.target.value)}
-                autoFocus
-                data-testid="taskInput"
-              />
-              <button className="btn btn-primary" type="submit">
-                Add
-              </button>
-              <button
-                className="btn btn-outline-secondary"
-                type="button"
-                onClick={() => setShowTaskForm(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        )}
 
         {tasksForDate.length === 0 ? (
           <div className="text-muted">No tasks for this date</div>
         ) : (
           <div className="task-list">
-            {tasksForDate.map((task) => (
-              <div key={task.id} className="task-row" data-testid={`task-${task.id}`}>
-                <span
-                  className={`task-title ${
-                    task.completedDate === selectedDate ? 'completed' : ''
-                  }`}
+            {tasksForDate.map((task) => {
+              const isCompleted = task.completedDate === selectedDate
+              const titleColor = getReadableTextColor(task.backgroundColor)
+              return (
+                <div
+                  key={task.id}
+                  className="task-row"
+                  style={{ backgroundColor: task.backgroundColor ?? '#f8f9fa' }}
+                  data-testid={'task-' + task.id}
                 >
-                  {task.title}
-                </span>
-                <button
-                  className={`task-toggle ${
-                    task.completedDate === selectedDate ? 'done' : ''
-                  }`}
-                  onClick={() => toggleTaskCompletion(task.id, selectedDate)}
-                  aria-label={`${task.title} ${task.completedDate === selectedDate ? 'done' : 'pending'}`}
-                >
-                  {task.completedDate === selectedDate && '✓'}
-                </button>
-              </div>
-            ))}
+                  <span
+                    className={'task-title' + (isCompleted ? ' completed' : '')}
+                    style={{ color: isCompleted ? '#6c757d' : titleColor }}
+                  >
+                    {task.title}
+                    {!task.synced && (
+                      <span className="task-offline-badge" title="Pending sync">●</span>
+                    )}
+                  </span>
+                  <button
+                    className={'task-toggle' + (isCompleted ? ' done' : '')}
+                    onClick={() => handleToggle(task.id, isCompleted)}
+                    aria-label={task.title + (isCompleted ? ' done' : ' pending')}
+                  >
+                    {isCompleted && '✓'}
+                  </button>
+                </div>
+              )
+            })}
           </div>
         )}
 
@@ -224,6 +211,7 @@ export default function Dashboard({
         </div>
       </div>
 
+      {/* FAB */}
       <button
         className="fab"
         onClick={() => setQuickAddOpen(true)}
@@ -240,9 +228,17 @@ export default function Dashboard({
         onSelectTask={handleQuickAddTask}
         onSelectPriority={handleQuickAddPriority}
       />
+
+      <TaskWizard
+        open={taskWizardOpen}
+        onClose={() => setTaskWizardOpen(false)}
+        onSave={handleSaveTask}
+      />
     </div>
   )
 }
+
+// ─── HabitCard ────────────────────────────────────────────────────────────────
 
 interface HabitCardProps {
   habit: Habit
@@ -251,7 +247,7 @@ interface HabitCardProps {
 
 function HabitCard({ habit, onComplete }: HabitCardProps) {
   return (
-    <div className="habit-card card" data-testid={`habitCard-${habit.id}`}>
+    <div className="habit-card card" data-testid={'habitCard-' + habit.id}>
       <div className="card-body">
         <div className="d-flex justify-content-between align-items-start mb-2">
           <h3 className="card-title h6 mb-0">{habit.name}</h3>
@@ -262,14 +258,11 @@ function HabitCard({ habit, onComplete }: HabitCardProps) {
           <div
             className="progress-bar"
             role="progressbar"
-            style={{
-              width: `${habit.progress * 100}%`,
-              backgroundColor: habit.color,
-            }}
+            style={{ width: (habit.progress * 100) + '%', backgroundColor: habit.color }}
             aria-valuenow={habit.progress * 100}
             aria-valuemin={0}
             aria-valuemax={100}
-          ></div>
+          />
         </div>
 
         <div className="d-flex justify-content-between align-items-center">
@@ -278,13 +271,9 @@ function HabitCard({ habit, onComplete }: HabitCardProps) {
           </small>
           <button
             className="btn btn-sm"
-            style={{
-              backgroundColor: habit.color,
-              color: 'white',
-              border: 'none',
-            }}
+            style={{ backgroundColor: habit.color, color: 'white', border: 'none' }}
             onClick={onComplete}
-            data-testid={`habitLog-${habit.id}`}
+            data-testid={'habitLog-' + habit.id}
           >
             Log
           </button>
