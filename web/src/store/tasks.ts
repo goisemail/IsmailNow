@@ -145,7 +145,7 @@ export function taskVisibleOnDate(task: PendingTask, date: string): boolean {
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export const useTasksStore = create<TasksStore>((set, get) => ({
+export const useTasksStore = create<TasksStore>((set) => ({
   tasks: [],
   loading: false,
   error: null,
@@ -225,15 +225,13 @@ export const useTasksStore = create<TasksStore>((set, get) => ({
   },
 
   flushToDrive: async (token) => {
-    const tasks = get().tasks
     try {
-      await saveTasksToDrive(token, tasks)
-      // Mark all tasks as synced after a successful flush
-      set((state) => {
-        const updated = state.tasks.map((t) => ({ ...t, synced: true }))
-        saveToStorage(updated)
-        return { tasks: updated }
-      })
+      const driveTasks = await loadTasksFromDrive(token)
+      const localTasks = loadFromStorage().map(normalizeTask)
+      const merged = mergeTasks(localTasks, driveTasks).map((task) => ({ ...task, synced: true }))
+      await saveTasksToDrive(token, merged)
+      saveToStorage(merged)
+      set({ tasks: merged })
     } catch (err) {
       console.error('flushToDrive failed:', err)
     }
