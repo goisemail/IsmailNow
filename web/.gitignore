@@ -26,8 +26,11 @@ dist-ssr
 *.sln
 *.sw?
 
-# Vite
-.vite
+# Environment files — never commit real credentials
+.env
+.env.local
+.env.*.local
+
 
 # PWA
 sw.js
