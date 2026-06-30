@@ -30,6 +30,8 @@ interface TasksStore {
   fetchForDate: (date: string, token: string | null) => Promise<void>
   /** Add a task — writes to localStorage immediately; Drive flush is periodic. */
   addTask: (title: string, startDate: string, token: string | null) => Promise<void>
+  /** Rename a task locally; the next Drive flush will propagate the edit. */
+  updateTaskTitle: (id: string, title: string) => void
   /**
    * Mark a task complete on `date`. The task will no longer appear on future
    * dates after `date`.
@@ -191,6 +193,19 @@ export const useTasksStore = create<TasksStore>((set) => ({
     // Write locally immediately for instant UI; Drive flush is periodic
     set((state) => {
       const updated = [...state.tasks, newTask]
+      saveToStorage(updated)
+      return { tasks: updated }
+    })
+  },
+
+  updateTaskTitle: (id, title) => {
+    const cleanTitle = title.trim()
+    if (!cleanTitle) return
+
+    set((state) => {
+      const updated = state.tasks.map((task) =>
+        task.id === id ? { ...task, title: cleanTitle, synced: false } : task,
+      )
       saveToStorage(updated)
       return { tasks: updated }
     })

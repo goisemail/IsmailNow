@@ -4,26 +4,36 @@ import './TaskWizard.css'
 interface TaskWizardProps {
   open: boolean
   onClose: () => void
-  onSave: (taskName: string) => void
+  onSave: (taskName: string) => void | Promise<void>
+  initialName?: string
+  title?: string
+  submitLabel?: string
 }
 
-export default function TaskWizard({ open, onClose, onSave }: TaskWizardProps) {
+export default function TaskWizard({
+  open,
+  onClose,
+  onSave,
+  initialName = '',
+  title = 'Add Task',
+  submitLabel = 'OK',
+}: TaskWizardProps) {
   const [taskName, setTaskName] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
   // Focus the input whenever the wizard opens
   useEffect(() => {
     if (open) {
-      setTaskName('')
+      setTaskName(initialName)
       setTimeout(() => inputRef.current?.focus(), 50)
     }
-  }, [open])
+  }, [open, initialName])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const trimmed = taskName.trim()
     if (!trimmed) return
-    onSave(trimmed)
+    await onSave(trimmed)
     setTaskName('')
     onClose()
   }
@@ -44,7 +54,7 @@ export default function TaskWizard({ open, onClose, onSave }: TaskWizardProps) {
     >
       <div className="task-wizard-card">
         <h2 className="task-wizard-title" id="task-wizard-title">
-          Add Task
+          {title}
         </h2>
 
         <form onSubmit={handleSubmit}>
@@ -76,7 +86,7 @@ export default function TaskWizard({ open, onClose, onSave }: TaskWizardProps) {
               disabled={!taskName.trim()}
               data-testid="taskWizardOk"
             >
-              OK
+              {submitLabel}
             </button>
           </div>
         </form>

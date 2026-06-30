@@ -76,6 +76,7 @@
   background: #157347;
 }
 
+.task-edit-btn,
 .task-delete-btn {
   border: 1px solid #dc3545;
   color: #dc3545;
@@ -90,6 +91,7 @@
   flex-shrink: 0;
 }
 
+.task-edit-btn:hover,
 .task-delete-btn:hover {
   background: #dc3545;
   color: #ffffff;
@@ -102,14 +104,12 @@
 }
 
 .completed-more-btn {
-  width: 42px;
-  height: 42px;
-  border: 1px solid #ced4da;
+  width: 52px;
+  height: 52px;
+  border: 2px solid #ced4da;
   border-radius: 999px;
   background: #ffffff;
-  color: #495057;
-  font-size: 20px;
-  line-height: 1;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -125,8 +125,45 @@
 .completed-more-btn:disabled {
   background: #f1f3f5;
   border-color: #dee2e6;
-  color: #adb5bd;
   cursor: not-allowed;
+}
+
+.completed-more-icon {
+  position: relative;
+  width: 30px;
+  height: 36px;
+}
+
+.completed-more-icon::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 10px;
+  height: 23px;
+  background: #343a40;
+  transform: translateX(-50%);
+}
+
+.completed-more-icon::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-top: 16px solid #343a40;
+  transform: translateX(-50%);
+}
+
+.completed-more-btn:disabled .completed-more-icon::before {
+  background: #adb5bd;
+}
+
+.completed-more-btn:disabled .completed-more-icon::after {
+  border-top-color: #adb5bd;
 }
 
 /* FAB Button */

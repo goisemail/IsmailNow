@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTasksStore, PendingTask } from '../store/tasks'
 import { useAuth } from '../contexts/AuthContext'
-import { Trash2 } from 'lucide-react'
+import { Pencil, Trash2 } from 'lucide-react'
 import { formatDate } from '../utils/date'
 import { getReadableTextColor } from '../utils/color'
 import TaskWizard from '../components/TaskWizard'
@@ -10,6 +10,7 @@ import './Tasks.css'
 export default function Tasks() {
   const tasks = useTasksStore((state) => state.tasks)
   const addTask = useTasksStore((state) => state.addTask)
+  const updateTaskTitle = useTasksStore((state) => state.updateTaskTitle)
   const markComplete = useTasksStore((state) => state.markComplete)
   const unmarkComplete = useTasksStore((state) => state.unmarkComplete)
   const deleteTask = useTasksStore((state) => state.deleteTask)
@@ -20,6 +21,7 @@ export default function Tasks() {
   const today = formatDate(new Date())
 
   const [taskWizardOpen, setTaskWizardOpen] = useState(false)
+  const [editingTask, setEditingTask] = useState<PendingTask | null>(null)
   const [visibleCompletedCount, setVisibleCompletedCount] = useState(3)
   const previousCompletedCount = useRef(0)
 
@@ -48,7 +50,27 @@ export default function Tasks() {
     previousCompletedCount.current = completed.length
   }, [completed.length])
 
+  const handleOpenAddTask = () => {
+    setEditingTask(null)
+    setTaskWizardOpen(true)
+  }
+
+  const handleOpenEditTask = (task: PendingTask) => {
+    setEditingTask(task)
+    setTaskWizardOpen(true)
+  }
+
+  const handleCloseTaskWizard = () => {
+    setTaskWizardOpen(false)
+    setEditingTask(null)
+  }
+
   const handleSaveTask = async (taskName: string) => {
+    if (editingTask) {
+      updateTaskTitle(editingTask.id, taskName)
+      return
+    }
+
     await addTask(taskName, today, token)
   }
 
@@ -74,6 +96,7 @@ export default function Tasks() {
                     task={task}
                     today={today}
                     onToggle={() => handleToggle(task)}
+                    onEdit={() => handleOpenEditTask(task)}
                     onDelete={() => deleteTask(task.id)}
                   />
                 ))}
@@ -91,7 +114,9 @@ export default function Tasks() {
                     task={task}
                     today={today}
                     onToggle={() => handleToggle(task)}
+                    onEdit={() => handleOpenEditTask(task)}
                     onDelete={() => deleteTask(task.id)}
+                    canEdit={false}
                   />
                 ))}
               </div>
@@ -103,7 +128,7 @@ export default function Tasks() {
                   disabled={!hasMoreCompleted}
                   aria-label="Show more completed tasks"
                 >
-                  ⬇
+                  <span className="completed-more-icon" aria-hidden="true" />
                 </button>
               </div>
             </section>
@@ -114,7 +139,7 @@ export default function Tasks() {
       <button
         className="fab"
         type="button"
-        onClick={() => setTaskWizardOpen(true)}
+        onClick={handleOpenAddTask}
         aria-label="Add task"
         data-testid="add-task-fab"
       >
@@ -123,8 +148,11 @@ export default function Tasks() {
 
       <TaskWizard
         open={taskWizardOpen}
-        onClose={() => setTaskWizardOpen(false)}
+        onClose={handleCloseTaskWizard}
         onSave={handleSaveTask}
+        initialName={editingTask?.title ?? ''}
+        title={editingTask ? 'Edit Task' : 'Add Task'}
+        submitLabel={editingTask ? 'Save' : 'OK'}
       />
     </div>
   )
@@ -134,10 +162,12 @@ interface TaskRowProps {
   task: PendingTask
   today: string
   onToggle: () => void
+  onEdit: () => void
   onDelete: () => void
+  canEdit?: boolean
 }
 
-function TaskRow({ task, onToggle, onDelete }: TaskRowProps) {
+function TaskRow({ task, onToggle, onEdit, onDelete, canEdit = true }: TaskRowProps) {
   const isDone = !!task.completedDate
   const titleColor = getReadableTextColor(task.backgroundColor)
 
@@ -165,6 +195,21 @@ function TaskRow({ task, onToggle, onDelete }: TaskRowProps) {
       >
         {isDone && '✓'}
       </button>
+      {canEdit && (
+        <button
+          className="task-edit-btn"
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onEdit()
+          }}
+          title="Edit"
+          aria-label={`Edit ${task.title}`}
+          data-testid={`task-edit-${task.id}`}
+        >
+          <Pencil size={14} />
+        </button>
+      )}
       <button
         className="task-delete-btn"
         type="button"
