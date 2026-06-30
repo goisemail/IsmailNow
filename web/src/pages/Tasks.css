@@ -95,6 +95,72 @@
   color: #ffffff;
 }
 
+.completed-more-wrap {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.completed-more-btn {
+  width: 42px;
+  height: 42px;
+  border: 1px solid #ced4da;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #495057;
+  font-size: 20px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.completed-more-btn:hover:not(:disabled) {
+  background: #f8f9fa;
+  border-color: #adb5bd;
+}
+
+.completed-more-btn:disabled {
+  background: #f1f3f5;
+  border-color: #dee2e6;
+  color: #adb5bd;
+  cursor: not-allowed;
+}
+
+/* FAB Button */
+.fab {
+  position: fixed;
+  bottom: 92px;
+  right: 22px;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: #FF9500;
+  border: none;
+  color: white;
+  font-size: 34px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(255, 149, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  transition: transform 0.2s, box-shadow 0.2s;
+  line-height: 1;
+}
+
+.fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(255, 149, 0, 0.5);
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
 @media (max-width: 576px) {
   .tasks-page {
     padding-left: 0.75rem;
@@ -112,5 +178,13 @@
 
   .task-date {
     display: none;
+  }
+
+  .fab {
+    bottom: 76px;
+    right: 16px;
+    width: 56px;
+    height: 56px;
+    font-size: 30px;
   }
 }

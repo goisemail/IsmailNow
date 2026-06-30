@@ -24,6 +24,23 @@
   cursor: pointer;
 }
 
+.app-header-login {
+  margin-left: auto;
+  background: #e72372;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 9px 14px;
+}
+
+.app-header-login:hover {
+  background: #c2185b;
+}
+
 /* Global App Styles */
 
 html,

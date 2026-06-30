@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTasksStore, PendingTask } from '../store/tasks'
 import { useAuth } from '../contexts/AuthContext'
-import { Plus, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { formatDate } from '../utils/date'
 import { getReadableTextColor } from '../utils/color'
+import TaskWizard from '../components/TaskWizard'
 import './Tasks.css'
 
 export default function Tasks() {
@@ -18,19 +19,9 @@ export default function Tasks() {
 
   const today = formatDate(new Date())
 
-  const [showForm, setShowForm] = useState(false)
-  const [taskTitle, setTaskTitle] = useState('')
-  const [taskDate, setTaskDate] = useState(today)
-
-  const handleAdd = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (taskTitle.trim()) {
-      addTask(taskTitle.trim(), taskDate, token)
-      setTaskTitle('')
-      setTaskDate(today)
-      setShowForm(false)
-    }
-  }
+  const [taskWizardOpen, setTaskWizardOpen] = useState(false)
+  const [visibleCompletedCount, setVisibleCompletedCount] = useState(3)
+  const previousCompletedCount = useRef(0)
 
   const handleToggle = (task: PendingTask) => {
     if (task.completedDate) {
@@ -41,61 +32,31 @@ export default function Tasks() {
   }
 
   const pending = tasks.filter((t) => !t.completedDate)
-  const completed = tasks.filter((t) => !!t.completedDate)
+  const completed = tasks
+    .filter((t) => !!t.completedDate)
+    .sort((a, b) => {
+      const completedDateOrder = (b.completedDate ?? '').localeCompare(a.completedDate ?? '')
+      return completedDateOrder || b.createdAt.localeCompare(a.createdAt)
+    })
+  const completedToShow = completed.slice(0, visibleCompletedCount)
+  const hasMoreCompleted = visibleCompletedCount < completed.length
+
+  useEffect(() => {
+    if (completed.length > previousCompletedCount.current) {
+      setVisibleCompletedCount(3)
+    }
+    previousCompletedCount.current = completed.length
+  }, [completed.length])
+
+  const handleSaveTask = async (taskName: string) => {
+    await addTask(taskName, today, token)
+  }
 
   return (
     <div className="tasks-page container-lg py-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="h3 mb-0">Tasks</h1>
-        <button
-          className="btn btn-primary btn-sm d-flex align-items-center gap-1"
-          onClick={() => setShowForm((v) => !v)}
-          data-testid="add-task-btn"
-        >
-          <Plus size={16} />
-          Add Task
-        </button>
       </div>
-
-      {showForm && (
-        <form onSubmit={handleAdd} className="card p-3 mb-4" data-testid="task-form">
-          <h2 className="h6 mb-3">New Task</h2>
-          <div className="mb-3">
-            <label className="form-label">Title</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="e.g. Buy groceries"
-              value={taskTitle}
-              onChange={(e) => setTaskTitle(e.target.value)}
-              autoFocus
-              data-testid="task-title-input"
-            />
-          </div>
-          <div className="mb-3">
-            <label className="form-label">Date</label>
-            <input
-              type="date"
-              className="form-control"
-              value={taskDate}
-              onChange={(e) => setTaskDate(e.target.value)}
-              data-testid="task-date-input"
-            />
-          </div>
-          <div className="d-flex gap-2">
-            <button className="btn btn-primary btn-sm" type="submit">
-              Save
-            </button>
-            <button
-              className="btn btn-outline-secondary btn-sm"
-              type="button"
-              onClick={() => setShowForm(false)}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
 
       {tasks.length === 0 ? (
         <div className="alert alert-info">
@@ -124,7 +85,7 @@ export default function Tasks() {
             <section>
               <h2 className="h6 text-muted mb-2">Completed ({completed.length})</h2>
               <div className="task-list">
-                {completed.map((task) => (
+                {completedToShow.map((task) => (
                   <TaskRow
                     key={task.id}
                     task={task}
@@ -134,10 +95,37 @@ export default function Tasks() {
                   />
                 ))}
               </div>
+              <div className="completed-more-wrap">
+                <button
+                  type="button"
+                  className="completed-more-btn"
+                  onClick={() => setVisibleCompletedCount((prev) => prev + 3)}
+                  disabled={!hasMoreCompleted}
+                  aria-label="Show more completed tasks"
+                >
+                  ⬇
+                </button>
+              </div>
             </section>
           )}
         </>
       )}
+
+      <button
+        className="fab"
+        type="button"
+        onClick={() => setTaskWizardOpen(true)}
+        aria-label="Add task"
+        data-testid="add-task-fab"
+      >
+        +
+      </button>
+
+      <TaskWizard
+        open={taskWizardOpen}
+        onClose={() => setTaskWizardOpen(false)}
+        onSave={handleSaveTask}
+      />
     </div>
   )
 }
