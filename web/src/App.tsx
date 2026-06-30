@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useHabitsStore } from './store/habits'
 import { useTasksStore } from './store/tasks'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
@@ -35,7 +35,7 @@ function AppContent() {
   const loadTasks = useTasksStore((state) => state.load)
   const syncWithDrive = useTasksStore((state) => state.syncWithDrive)
 
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const isOnline = useOnlineStatus()
 
   // Set up periodic Drive flush, visibilitychange, and online-recovery flush
@@ -46,6 +46,7 @@ function AppContent() {
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()))
   const [weekOffset, setWeekOffset] = useState(0)
   const location = useLocation()
+  const navigate = useNavigate()
 
   // Load local data on mount
   useEffect(() => {
@@ -72,6 +73,20 @@ function AppContent() {
     }
   }
 
+  const handleLogout = () => {
+    signOut()
+    setSidebarOpen(false)
+    navigate('/login', { replace: true })
+  }
+
+  const handleHeaderLogin = () => {
+    if (user?.isGuest) {
+      signOut()
+    }
+    setSidebarOpen(false)
+    navigate('/login')
+  }
+
   return (
     <div className="app-wrapper">
       {/* Offline banner */}
@@ -91,6 +106,15 @@ function AppContent() {
           &#9776;
         </button>
         <span className="app-header-title">Ismail Now</span>
+        {(!user || user.isGuest) && (
+          <button
+            className="app-header-login"
+            type="button"
+            onClick={handleHeaderLogin}
+          >
+            Log in
+          </button>
+        )}
         {user && !user.isGuest && user.photoUrl && (
           <img
             src={user.photoUrl}
@@ -105,8 +129,10 @@ function AppContent() {
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onSyncToCloud={handleManualSync}
+        onLogout={handleLogout}
         syncing={syncing}
         canSync={Boolean(user?.accessToken)}
+        canLogout={Boolean(user)}
       />
 
       {location.pathname === '/' && (

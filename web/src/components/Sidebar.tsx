@@ -5,11 +5,21 @@ interface SidebarProps {
   open: boolean
   onClose: () => void
   onSyncToCloud: () => void
+  onLogout: () => void
   syncing: boolean
   canSync: boolean
+  canLogout: boolean
 }
 
-export default function Sidebar({ open, onClose, onSyncToCloud, syncing, canSync }: SidebarProps) {
+export default function Sidebar({
+  open,
+  onClose,
+  onSyncToCloud,
+  onLogout,
+  syncing,
+  canSync,
+  canLogout,
+}: SidebarProps) {
   const now = new Date()
   const weekday = now.toLocaleDateString('en-US', { weekday: 'long' })
   const dateStr = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -55,6 +65,14 @@ export default function Sidebar({ open, onClose, onSyncToCloud, syncing, canSync
         >
           {syncing ? 'Syncing…' : 'Sync to Cloud'}
         </button>
+        {canLogout && (
+          <button
+            className="sidebar-item sidebar-logout-btn"
+            onClick={onLogout}
+          >
+            Log out
+          </button>
+        )}
       </div>
     </>
   )

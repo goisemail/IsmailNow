@@ -110,3 +110,11 @@
 .sidebar-sync-btn:disabled:hover {
   color: #c8cad0;
 }
+
+.sidebar-logout-btn {
+  margin-top: 4px;
+}
+
+.sidebar-logout-btn:hover {
+  color: #ff6b8a;
+}
