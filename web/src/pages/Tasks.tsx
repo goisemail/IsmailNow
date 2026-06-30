@@ -32,8 +32,13 @@ export default function Tasks() {
   }
 
   const pending = tasks.filter((t) => !t.completedDate)
-  const completed = tasks.filter((t) => !!t.completedDate)
-  const completedToShow = completed.slice(-visibleCompletedCount)
+  const completed = tasks
+    .filter((t) => !!t.completedDate)
+    .sort((a, b) => {
+      const completedDateOrder = (b.completedDate ?? '').localeCompare(a.completedDate ?? '')
+      return completedDateOrder || b.createdAt.localeCompare(a.createdAt)
+    })
+  const completedToShow = completed.slice(0, visibleCompletedCount)
   const hasMoreCompleted = visibleCompletedCount < completed.length
 
   useEffect(() => {
