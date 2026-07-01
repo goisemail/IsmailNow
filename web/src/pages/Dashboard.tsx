@@ -155,7 +155,8 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
               <div key={habit.id} className="col-12">
                 <HabitCard
                   habit={habit}
-                  onComplete={() => logCompletion(habit.id)}
+                  selectedDate={selectedDate}
+                  onComplete={() => logCompletion(habit.id, selectedDate)}
                 />
               </div>
             ))}
@@ -242,10 +243,13 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
 
 interface HabitCardProps {
   habit: Habit
+  selectedDate: string
   onComplete: () => void
 }
 
-function HabitCard({ habit, onComplete }: HabitCardProps) {
+function HabitCard({ habit, selectedDate, onComplete }: HabitCardProps) {
+  const isDone = habit.lastCompletedDate === selectedDate
+
   return (
     <div className="habit-card card" data-testid={'habitCard-' + habit.id}>
       <div className="card-body">
@@ -270,12 +274,12 @@ function HabitCard({ habit, onComplete }: HabitCardProps) {
             {(habit.progress * 100).toFixed(0)}% complete
           </small>
           <button
-            className="btn btn-sm"
-            style={{ backgroundColor: habit.color, color: 'white', border: 'none' }}
+            className={'habit-toggle' + (isDone ? ' done' : '')}
             onClick={onComplete}
+            aria-label={habit.name + (isDone ? ' done' : ' mark as completed')}
             data-testid={'habitLog-' + habit.id}
           >
-            Log
+            {isDone && '✓'}
           </button>
         </div>
       </div>

@@ -15,7 +15,8 @@ interface HabitsStore {
   save: () => Promise<void>
   addHabit: (habit: Omit<Habit, 'id' | 'progress' | 'streak'>) => void
   updateHabit: (id: string, patch: Partial<Habit>) => void
-  logCompletion: (id: string) => void
+  /** Log (or toggle off) a habit completion for `date` (defaults to today). */
+  logCompletion: (id: string, date?: string) => void
   deleteHabit: (id: string) => void
 }
 
@@ -74,17 +75,25 @@ export const useHabitsStore = create<HabitsStore>((set) => ({
     })
   },
 
-  logCompletion: (id) => {
+  logCompletion: (id, date) => {
     set((state) => {
-      const today = new Date().toISOString().split('T')[0]
+      const target = date ?? new Date().toISOString().split('T')[0]
       const updated = state.habits.map((h) => {
         if (h.id === id) {
-          const wasCompletedToday = h.lastCompletedDate === today
+          // Toggle off if already completed on that date
+          if (h.lastCompletedDate === target) {
+            return {
+              ...h,
+              progress: Math.max(0, h.progress - 0.1),
+              streak: Math.max(0, h.streak - 1),
+              lastCompletedDate: undefined,
+            }
+          }
           return {
             ...h,
             progress: Math.min(1, h.progress + 0.1),
-            streak: wasCompletedToday ? h.streak : h.streak + 1,
-            lastCompletedDate: today,
+            streak: h.streak + 1,
+            lastCompletedDate: target,
           }
         }
         return h

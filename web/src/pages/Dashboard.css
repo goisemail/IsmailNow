@@ -277,6 +277,48 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
+/* Habit completion toggle — mirrors .task-toggle */
+.habit-toggle {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  background: #e9ecef;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: transparent;
+  transition: all 0.2s;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.habit-toggle:hover {
+  background: #dee2e6;
+}
+
+.habit-toggle.done {
+  background: #198754;
+  color: white;
+}
+
+.habit-toggle.done:hover {
+  background: #157347;
+}
+
+@media (prefers-color-scheme: dark) {
+  .habit-toggle {
+    background: #495057;
+  }
+
+  .habit-toggle:hover {
+    background: #343a40;
+  }
+}
+
 /* FAB Button */
 .fab {
   position: fixed;
