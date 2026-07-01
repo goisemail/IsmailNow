@@ -33,9 +33,9 @@ export default function Tasks() {
     }
   }
 
-  const pending = tasks.filter((t) => !t.completedDate)
+  const pending = tasks.filter((t) => !t.completedDate && !t.isDeleted)
   const completed = tasks
-    .filter((t) => !!t.completedDate)
+    .filter((t) => !!t.completedDate && !t.isDeleted)
     .sort((a, b) => {
       const completedDateOrder = (b.completedDate ?? '').localeCompare(a.completedDate ?? '')
       return completedDateOrder || b.createdAt.localeCompare(a.createdAt)
@@ -80,7 +80,7 @@ export default function Tasks() {
         <h1 className="h3 mb-0">Tasks</h1>
       </div>
 
-      {tasks.length === 0 ? (
+      {pending.length === 0 && completed.length === 0 ? (
         <div className="alert alert-info">
           No tasks yet. Tap <strong>Add Task</strong> to create your first one!
         </div>
@@ -97,7 +97,7 @@ export default function Tasks() {
                     today={today}
                     onToggle={() => handleToggle(task)}
                     onEdit={() => handleOpenEditTask(task)}
-                    onDelete={() => deleteTask(task.id)}
+                    onDelete={() => deleteTask(task.id, token)}
                   />
                 ))}
               </div>
@@ -115,7 +115,7 @@ export default function Tasks() {
                     today={today}
                     onToggle={() => handleToggle(task)}
                     onEdit={() => handleOpenEditTask(task)}
-                    onDelete={() => deleteTask(task.id)}
+                    onDelete={() => deleteTask(task.id, token)}
                     canEdit={false}
                   />
                 ))}

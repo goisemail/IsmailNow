@@ -20,7 +20,9 @@ export default function History() {
 
   const calendarEvents = useMemo(
     () =>
-      tasks.map((task, index) => {
+      tasks
+        .filter((task) => !task.isDeleted)
+        .map((task, index) => {
         const start = new Date(`${task.startDate}T09:00:00`)
         start.setHours(9 + (index % 8), 0, 0, 0)
         const end = new Date(start)
@@ -85,7 +87,7 @@ export default function History() {
         </div>
         <div className="card">
           <div className="text-muted">Total Tasks</div>
-          <div className="h2">{tasks.length}</div>
+          <div className="h2">{tasks.filter((t) => !t.isDeleted).length}</div>
         </div>
         <div className="card" style={{ flex: 2 }}>
           <div className="text-muted" style={{ fontSize: '0.75rem', marginBottom: 4 }}>Top Streak</div>

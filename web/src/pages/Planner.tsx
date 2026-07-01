@@ -18,7 +18,9 @@ export default function Planner() {
 
   const plannerEvents = useMemo(
     () =>
-      tasks.map((task, index) => {
+      tasks
+        .filter((task) => !task.isDeleted)
+        .map((task, index) => {
         const start = new Date(`${task.startDate}T09:00:00`)
         start.setHours(9 + (index % 8), 0, 0, 0)
         const end = new Date(start)
