@@ -13,6 +13,7 @@ interface HabitsStore {
   habits: Habit[]
   load: () => Promise<void>
   save: () => Promise<void>
+  reset: () => void
   addHabit: (habit: Omit<Habit, 'id' | 'progress' | 'streak'>) => void
   updateHabit: (id: string, patch: Partial<Habit>) => void
   logCompletion: (id: string) => void
@@ -48,6 +49,11 @@ export const useHabitsStore = create<HabitsStore>((set) => ({
     } catch (error) {
       console.error('Failed to save habits:', error)
     }
+  },
+
+  reset: () => {
+    localStorage.removeItem(STORAGE_KEY)
+    set({ habits: [] })
   },
 
   addHabit: (habitData) => {

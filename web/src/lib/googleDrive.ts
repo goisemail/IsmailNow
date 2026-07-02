@@ -113,11 +113,16 @@ function parseTasksArray(text: string): PendingTask[] {
         title,
         startDate,
         createdAt: typeof createdAt === 'string' ? createdAt : new Date().toISOString(),
+        updatedAt:
+          typeof raw.updatedAt === 'string' && raw.updatedAt.length > 0
+            ? raw.updatedAt
+            : (typeof createdAt === 'string' ? createdAt : new Date().toISOString()),
         synced: true,
       }
 
       if (typeof raw.backgroundColor === 'string') normalized.backgroundColor = raw.backgroundColor
       if (completedDate) normalized.completedDate = completedDate
+      if (raw.isDeleted === true) normalized.isDeleted = true
 
       return [normalized]
     })

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useHabitsStore } from '../store/habits'
 import { useTasksStore } from '../store/tasks'
+import { useAuth } from '../contexts/AuthContext'
 import { Trash2 } from 'lucide-react'
 
 export default function Settings() {
@@ -8,6 +9,9 @@ export default function Settings() {
   const deleteHabit = useHabitsStore((state) => state.deleteHabit)
   const tasks = useTasksStore((state) => state.tasks)
   const deleteTask = useTasksStore((state) => state.deleteTask)
+
+  const { user } = useAuth()
+  const token = user?.accessToken ?? null
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
@@ -25,6 +29,8 @@ export default function Settings() {
     link.download = `habbitnow-backup-${new Date().toISOString().split('T')[0]}.json`
     link.click()
   }
+
+  const visibleTasks = tasks.filter((t) => !t.isDeleted)
 
   return (
     <div className="container py-4">
@@ -79,21 +85,21 @@ export default function Settings() {
       {/* Manage Tasks */}
       <div className="card">
         <div className="card-header bg-light">
-          <h5 className="mb-0">Manage Tasks ({tasks.length})</h5>
+          <h5 className="mb-0">Manage Tasks ({visibleTasks.length})</h5>
         </div>
         <div className="card-body">
-          {tasks.length === 0 ? (
+          {visibleTasks.length === 0 ? (
             <p className="text-muted">No tasks to manage</p>
           ) : (
             <div className="list-group">
-              {tasks.map((task) => (
+              {visibleTasks.map((task) => (
                 <div key={task.id} className="list-group-item d-flex justify-content-between align-items-center">
                   <span>{task.title}</span>
                   <button
                     className="btn btn-sm btn-danger"
                     onClick={() =>
                       confirmDelete === task.id
-                        ? (deleteTask(task.id), setConfirmDelete(null))
+                        ? (deleteTask(task.id, token), setConfirmDelete(null))
                         : setConfirmDelete(task.id)
                     }
                     data-testid={`delete-task-${task.id}`}

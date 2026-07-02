@@ -1,5 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { clearDriveCache } from '../lib/googleDrive'
+import { useHabitsStore } from '../store/habits'
+import { useTasksStore } from '../store/tasks'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +46,12 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null)
   const [loading, setLoading] = useState(true)
+
+  const resetLocalSessionData = () => {
+    useHabitsStore.getState().reset()
+    useTasksStore.getState().reset()
+    clearDriveCache()
+  }
 
   // Restore session from localStorage on mount
   useEffect(() => {
@@ -106,6 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           isGuest: false,
         }
 
+        resetLocalSessionData()
         localStorage.setItem(USER_KEY, JSON.stringify(newUser))
         setUser(newUser)
       },
@@ -120,14 +129,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name: 'Guest',
       isGuest: true,
     }
+    resetLocalSessionData()
     localStorage.setItem(USER_KEY, JSON.stringify(guest))
-    clearDriveCache()
     setUser(guest)
   }
 
   const signOut = () => {
     localStorage.removeItem(USER_KEY)
-    clearDriveCache()
+    resetLocalSessionData()
     setUser(null)
   }
 
