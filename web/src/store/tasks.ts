@@ -33,6 +33,8 @@ interface TasksStore {
   error: string | null
   /** Load tasks from localStorage into memory (called on app start). */
   load: () => void
+  /** Clear local task storage and in-memory state. */
+  reset: () => void
   /**
    * Load tasks from Drive and merge with any local un-synced tasks.
    * Falls back to local-only when offline or unauthenticated.
@@ -185,6 +187,15 @@ export const useTasksStore = create<TasksStore>((set) => ({
 
   load: () => {
     set({ tasks: loadFromStorage().map(normalizeTask) })
+  },
+
+  reset: () => {
+    try {
+      localStorage.removeItem(TASKS_KEY)
+    } catch {
+      // Ignore storage errors while clearing state.
+    }
+    set({ tasks: [], loading: false, error: null })
   },
 
   fetchForDate: async (_date, token) => {
