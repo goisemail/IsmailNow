@@ -79,15 +79,16 @@ web/
 | **Codebase** | Separate iOS/Android | Single codebase |
 | **Installation** | App Store/Play Store | Browser + installable |
 | **Performance** | Native-like | Web-based |
-| **Offline** | AsyncStorage | LocalStorage/IndexedDB |
+| **Offline** | AsyncStorage | localStorage |
 | **Updates** | Manual app updates | Auto-update on deployment |
 | **Development** | Platform-specific | Universal |
 
 ## 🎯 Data Persistence
 
 ### LocalStorage Keys
-- `habbitnow_habits_v1` - All habits and their metadata
-- `ismailnow_tasks_v1` - All tasks and completion status
+- `ismailnow:v2:<account>:habits` - Account-scoped habits and metadata
+- `ismailnow:v2:<account>:tasks` - Account-scoped tasks and completion status
+- `ismailnow_user` - Non-sensitive profile only; OAuth access tokens stay in memory
 
 ### Data Structure
 
@@ -129,7 +130,11 @@ web/
 ### Offline Capabilities
 - Service worker automatically caches app shell
 - LocalStorage keeps habits and tasks available offline
-- All changes sync automatically
+- Task changes sync automatically for Google users; habits remain local-only
+
+### Google Drive Sync Safety
+
+Local sync operations are serialized and Drive file versions are checked before writes. The app also verifies content after each upload and retries bounded conflicts. Google Drive does not always expose a browser-usable conditional-write ETag, so this direct single-file integration cannot guarantee atomic simultaneous writes from multiple devices. A transactional backend is required before advertising strict multi-device consistency.
 
 ## 🔧 Development Commands
 
@@ -138,6 +143,7 @@ npm run dev           # Start dev server
 npm run build         # Production build
 npm run preview       # Preview production build
 npm run lint          # Run ESLint
+npm run test          # Run Vitest regression tests
 npm run type-check    # TypeScript check
 ```
 
@@ -185,7 +191,7 @@ npm run build
 
 - [ ] SQLite for advanced queries (Phase 2)
 - [ ] Local notifications/reminders
-- [ ] Google Drive OAuth + backup
+- [ ] Historical Google Drive backup snapshots and restore
 - [ ] i18n/localization
 - [ ] Advanced analytics dashboard
 - [ ] Dark mode toggle

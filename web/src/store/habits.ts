@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { accountStorageKey } from '../lib/accountStorage'
 
 export interface Habit {
   id: string
@@ -10,101 +11,88 @@ export interface Habit {
 }
 
 interface HabitsStore {
+  ownerId: string | null
   habits: Habit[]
-  load: () => Promise<void>
+  error: string | null
+  load: (ownerId: string) => Promise<void>
   save: () => Promise<void>
-  reset: () => void
+  clearMemory: () => void
   addHabit: (habit: Omit<Habit, 'id' | 'progress' | 'streak'>) => void
   updateHabit: (id: string, patch: Partial<Habit>) => void
   logCompletion: (id: string) => void
   deleteHabit: (id: string) => void
 }
 
-const STORAGE_KEY = 'habbitnow_habits_v1'
-
-export const useHabitsStore = create<HabitsStore>((set) => ({
-  habits: [],
-
-  load: async () => {
+export const useHabitsStore = create<HabitsStore>((set, get) => {
+  const persist = (ownerId: string, habits: Habit[]): string | null => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        set({ habits: parsed })
-      } else {
-        set({ habits: [] })
+      localStorage.setItem(accountStorageKey(ownerId, 'habits'), JSON.stringify(habits))
+      return null
+    } catch {
+      return 'Habit changes could not be saved in this browser.'
+    }
+  }
+
+  const updateLocal = (transform: (habits: Habit[]) => Habit[]): void => {
+    set((state) => {
+      if (!state.ownerId) return state
+      const habits = transform(state.habits)
+      return { habits, error: persist(state.ownerId, habits) }
+    })
+  }
+
+  return {
+    ownerId: null,
+    habits: [],
+    error: null,
+
+    load: async (ownerId) => {
+      try {
+        const stored = localStorage.getItem(accountStorageKey(ownerId, 'habits'))
+        set({ ownerId, habits: stored ? (JSON.parse(stored) as Habit[]) : [], error: null })
+      } catch {
+        set({ ownerId, habits: [], error: 'Saved habits could not be loaded.' })
       }
-    } catch (error) {
-      console.error('Failed to load habits:', error)
-      set({ habits: [] })
-    }
-  },
+    },
 
-  save: async () => {
-    try {
-      set((state) => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.habits))
-        return state
-      })
-    } catch (error) {
-      console.error('Failed to save habits:', error)
-    }
-  },
+    save: async () => {
+      const state = get()
+      if (!state.ownerId) return
+      set({ error: persist(state.ownerId, state.habits) })
+    },
 
-  reset: () => {
-    localStorage.removeItem(STORAGE_KEY)
-    set({ habits: [] })
-  },
+    clearMemory: () => set({ ownerId: null, habits: [], error: null }),
 
-  addHabit: (habitData) => {
-    const newHabit: Habit = {
-      id: Math.random().toString(36).substr(2, 9),
-      ...habitData,
-      progress: 0,
-      streak: 0,
-    }
-    set((state) => {
-      const updated = [...state.habits, newHabit]
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-      return { habits: updated }
-    })
-  },
+    addHabit: (habitData) => {
+      const habit: Habit = {
+        id: Math.random().toString(36).slice(2, 11),
+        ...habitData,
+        progress: 0,
+        streak: 0,
+      }
+      updateLocal((habits) => [...habits, habit])
+    },
 
-  updateHabit: (id, patch) => {
-    set((state) => {
-      const updated = state.habits.map((h) =>
-        h.id === id ? { ...h, ...patch } : h
-      )
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-      return { habits: updated }
-    })
-  },
+    updateHabit: (id, patch) => {
+      updateLocal((habits) => habits.map((habit) =>
+        habit.id === id ? { ...habit, ...patch } : habit,
+      ))
+    },
 
-  logCompletion: (id) => {
-    set((state) => {
+    logCompletion: (id) => {
       const today = new Date().toISOString().split('T')[0]
-      const updated = state.habits.map((h) => {
-        if (h.id === id) {
-          const wasCompletedToday = h.lastCompletedDate === today
-          return {
-            ...h,
-            progress: Math.min(1, h.progress + 0.1),
-            streak: wasCompletedToday ? h.streak : h.streak + 1,
-            lastCompletedDate: today,
-          }
+      updateLocal((habits) => habits.map((habit) => {
+        if (habit.id !== id) return habit
+        const completedToday = habit.lastCompletedDate === today
+        return {
+          ...habit,
+          progress: Math.min(1, habit.progress + 0.1),
+          streak: completedToday ? habit.streak : habit.streak + 1,
+          lastCompletedDate: today,
         }
-        return h
-      })
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-      return { habits: updated }
-    })
-  },
+      }))
+    },
 
-  deleteHabit: (id) => {
-    set((state) => {
-      const updated = state.habits.filter((h) => h.id !== id)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-      return { habits: updated }
-    })
-  },
-}))
+    deleteHabit: (id) => updateLocal((habits) => habits.filter((habit) => habit.id !== id)),
+  }
+})

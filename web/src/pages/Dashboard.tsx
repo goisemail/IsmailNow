@@ -99,16 +99,15 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
   const markComplete = useTasksStore((state) => state.markComplete)
   const unmarkComplete = useTasksStore((state) => state.unmarkComplete)
 
-  const { user } = useAuth()
-  const token = user?.accessToken ?? null
+  const { canSync, getAccessToken } = useAuth()
 
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [taskWizardOpen, setTaskWizardOpen] = useState(false)
 
   // Fetch tasks from Google Sheets whenever the selected date changes
   useEffect(() => {
-    fetchForDate(selectedDate, token)
-  }, [selectedDate, token])
+    fetchForDate(selectedDate, canSync ? getAccessToken : null)
+  }, [canSync, fetchForDate, getAccessToken, selectedDate])
 
   const handleQuickAddHabit = () => {
     window.location.href = '/habit/new'
@@ -125,14 +124,14 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
   }
 
   const handleSaveTask = async (taskName: string) => {
-    await addTask(taskName, selectedDate, token)
+    await addTask(taskName, selectedDate)
   }
 
   const handleToggle = (taskId: string, isCompleted: boolean) => {
     if (isCompleted) {
-      unmarkComplete(taskId, token)
+      unmarkComplete(taskId)
     } else {
-      markComplete(taskId, selectedDate, token)
+      markComplete(taskId, selectedDate)
     }
   }
 

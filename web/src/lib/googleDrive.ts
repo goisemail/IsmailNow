@@ -1,175 +1,262 @@
-/**
- * googleDrive.ts
- *
- * Stores the full task list as a single JSON file in the user's Google Drive.
- * Uses the Drive REST API v3 directly from the browser with the OAuth
- * access token obtained via Google Sign-In.
- *
- * The file is named 'ismailnow_data.json' and contains the complete
- * PendingTask array. It is written in bulk on a configurable interval
- * (see useDriveSync hook) rather than per-operation.
- */
-
 import type { PendingTask } from '../store/tasks'
 
 const DRIVE_FILE_NAME = 'ismailnow_data.json'
-const FILE_ID_KEY = 'ismailnow_drive_file_id'
-let resolveFilePromise: Promise<string> | null = null
+
+export type TokenProvider = (forceRefresh?: boolean) => Promise<string>
 
 interface DriveFileMeta {
   id: string
+  version: string
+  size?: string
+  appProperties?: Record<string, string>
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function authHeader(token: string): string {
-  return 'Bearer ' + token
+export interface DriveTasksSnapshot {
+  tasks: PendingTask[]
+  file: DriveFileMeta
 }
 
-async function listDriveDataFiles(token: string): Promise<DriveFileMeta[]> {
-  const searchUrl =
-    'https://www.googleapis.com/drive/v3/files?q=' +
-    encodeURIComponent(
-      "name='" + DRIVE_FILE_NAME + "' and mimeType='application/json' and trashed=false",
-    ) +
-    '&fields=files(id)&orderBy=createdTime asc'
-
-  const searchRes = await fetch(searchUrl, {
-    headers: { Authorization: authHeader(token) },
-  })
-  if (!searchRes.ok) {
-    const text = await searchRes.text()
-    throw new Error('Drive API error ' + searchRes.status + ': ' + text)
+export class DriveDataError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'DriveDataError'
   }
-  const searchJson = (await searchRes.json()) as { files?: DriveFileMeta[] }
-  return searchJson.files ?? []
 }
 
-function parseTasksArray(text: string): PendingTask[] {
-  if (!text.trim()) return []
-  try {
-    const parsed = JSON.parse(text) as unknown
-    let candidates: unknown[] = []
-    if (Array.isArray(parsed)) {
-      candidates = parsed
-    } else if (parsed && typeof parsed === 'object') {
-      const wrapped = parsed as { tasks?: unknown[]; data?: { tasks?: unknown[] } }
-      if (Array.isArray(wrapped.tasks)) {
-        candidates = wrapped.tasks
-      } else if (Array.isArray(wrapped.data?.tasks)) {
-        candidates = wrapped.data.tasks
-      }
-    }
+export class DriveConflictError extends Error {
+  constructor(message = 'The Drive file changed during synchronization.') {
+    super(message)
+    this.name = 'DriveConflictError'
+  }
+}
 
-    const normalizeDate = (value: unknown): string | undefined => {
-      if (typeof value !== 'string') return undefined
-      const ymd = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : value.slice(0, 10)
-      return /^\d{4}-\d{2}-\d{2}$/.test(ymd) ? ymd : undefined
-    }
+let cachedFile: DriveFileMeta | null = null
+let resolveFilePromise: Promise<DriveFileMeta> | null = null
 
-    const fallbackId = (title: string, startDate: string, createdAt: string, index: number): string => {
-      const seed = title + '|' + startDate + '|' + createdAt + '|' + index
-      let hash = 0
-      for (let i = 0; i < seed.length; i += 1) {
-        hash = (hash * 31 + seed.charCodeAt(i)) >>> 0
-      }
-      return 'legacy_' + hash.toString(36)
-    }
-
-    return candidates.flatMap((item, index) => {
-      if (!item || typeof item !== 'object') return []
-
-      const raw = item as Record<string, unknown>
-      const title = typeof raw.title === 'string'
-        ? raw.title
-        : (typeof raw.name === 'string' ? raw.name : undefined)
-      if (!title) return []
-
-      const createdAt =
-        typeof raw.createdAt === 'string'
-          ? raw.createdAt
-          : (
-              typeof raw.created === 'string'
-                ? raw.created
-                : new Date().toISOString()
-            )
-
-      const startDate =
-        normalizeDate(raw.startDate) ??
-        normalizeDate(raw.date) ??
-        normalizeDate(createdAt) ??
-        new Date().toISOString().slice(0, 10)
-
-      const completedDate =
-        normalizeDate(raw.completedDate) ??
-        normalizeDate(raw.completedAt) ??
-        normalizeDate(raw.doneDate)
-
-      const normalized: PendingTask = {
-        id:
-          typeof raw.id === 'string' && raw.id.trim().length > 0
-            ? raw.id
-            : fallbackId(title, startDate, createdAt, index),
-        title,
-        startDate,
-        createdAt: typeof createdAt === 'string' ? createdAt : new Date().toISOString(),
-        updatedAt:
-          typeof raw.updatedAt === 'string' && raw.updatedAt.length > 0
-            ? raw.updatedAt
-            : (typeof createdAt === 'string' ? createdAt : new Date().toISOString()),
-        synced: true,
-      }
-
-      if (typeof raw.backgroundColor === 'string') normalized.backgroundColor = raw.backgroundColor
-      if (completedDate) normalized.completedDate = completedDate
-      if (raw.isDeleted === true) normalized.isDeleted = true
-
-      return [normalized]
+async function driveFetch(
+  getToken: TokenProvider,
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const request = async (forceRefresh: boolean): Promise<Response> => {
+    const token = await getToken(forceRefresh)
+    return fetch(url, {
+      ...init,
+      headers: {
+        ...init.headers,
+        Authorization: `Bearer ${token}`,
+      },
     })
-  } catch {
-    return []
   }
+
+  let response = await request(false)
+  if (response.status === 401) response = await request(true)
+  return response
 }
 
-// ─── File bootstrap ───────────────────────────────────────────────────────────
+async function requireOk(response: Response): Promise<Response> {
+  if (response.ok) return response
+  const detail = await response.text()
+  throw new Error(`Drive API error ${response.status}: ${detail}`)
+}
 
-/**
- * Returns the Drive file ID for this user's ismailnow_data.json.
- * Searches Drive for an existing file on first call, creates it if missing,
- * and caches the ID in localStorage.
- */
-export async function getOrCreateDriveFile(token: string): Promise<string> {
+async function listDriveDataFiles(getToken: TokenProvider): Promise<DriveFileMeta[]> {
+  const query = `name='${DRIVE_FILE_NAME}' and mimeType='application/json' and trashed=false`
+  const url =
+    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}` +
+    '&fields=files(id,version,size,appProperties)&orderBy=createdTime asc'
+  const response = await requireOk(await driveFetch(getToken, url))
+  const body = (await response.json()) as { files?: DriveFileMeta[] }
+  return body.files ?? []
+}
+
+function validDate(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : value.slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return undefined
+  const [year, month, day] = date.split('-').map(Number)
+  const parsed = new Date(Date.UTC(year, month - 1, day))
+  return parsed.getUTCFullYear() === year &&
+    parsed.getUTCMonth() === month - 1 &&
+    parsed.getUTCDate() === day
+    ? date
+    : undefined
+}
+
+function validTimestamp(value: unknown): string | undefined {
+  if (typeof value !== 'string' || !value.trim() || !Number.isFinite(Date.parse(value))) {
+    return undefined
+  }
+  return new Date(value).toISOString()
+}
+
+function fallbackId(title: string, startDate: string, createdAt: string, index: number): string {
+  const seed = `${title}|${startDate}|${createdAt}|${index}`
+  let hash = 0
+  for (let offset = 0; offset < seed.length; offset += 1) {
+    hash = (hash * 31 + seed.charCodeAt(offset)) >>> 0
+  }
+  return `legacy_${hash.toString(36)}`
+}
+
+export function parseTasksDocument(text: string): PendingTask[] {
+  if (!text.trim()) throw new DriveDataError('The Drive sync file is empty or truncated.')
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text) as unknown
+  } catch {
+    throw new DriveDataError('The Drive sync file contains invalid JSON.')
+  }
+
+  let candidates: unknown[]
+  if (Array.isArray(parsed)) {
+    candidates = parsed
+  } else if (parsed && typeof parsed === 'object') {
+    const wrapped = parsed as {
+      schemaVersion?: unknown
+      tasks?: unknown
+      data?: { tasks?: unknown }
+    }
+    if (wrapped.schemaVersion !== undefined) {
+      throw new DriveDataError('The Drive sync file uses an unsupported schema version.')
+    }
+    if (Array.isArray(wrapped.tasks)) candidates = wrapped.tasks
+    else if (Array.isArray(wrapped.data?.tasks)) candidates = wrapped.data.tasks
+    else throw new DriveDataError('The Drive sync file has an unsupported structure.')
+  } else {
+    throw new DriveDataError('The Drive sync file has an unsupported structure.')
+  }
+
+  const ids = new Set<string>()
+  return candidates.map((item, index) => {
+    if (!item || typeof item !== 'object') {
+      throw new DriveDataError(`Task ${index + 1} is not an object.`)
+    }
+
+    const raw = item as Record<string, unknown>
+    const titleValue = typeof raw.title === 'string' ? raw.title : raw.name
+    const title = typeof titleValue === 'string' ? titleValue.trim() : ''
+    if (!title) throw new DriveDataError(`Task ${index + 1} has no title.`)
+
+    const startDate = validDate(raw.startDate) ?? validDate(raw.date) ?? validDate(raw.createdAt)
+    if (!startDate) throw new DriveDataError(`Task ${index + 1} has no valid start date.`)
+
+    const createdAt =
+      validTimestamp(raw.createdAt) ??
+      validTimestamp(raw.created) ??
+      `${startDate}T00:00:00.000Z`
+    const updatedAt = validTimestamp(raw.updatedAt) ?? createdAt
+    const id =
+      typeof raw.id === 'string' && raw.id.trim()
+        ? raw.id
+        : fallbackId(title, startDate, createdAt, index)
+
+    if (ids.has(id)) throw new DriveDataError(`The Drive sync file contains duplicate task ID ${id}.`)
+    ids.add(id)
+
+    const completedValue = raw.completedDate ?? raw.completedAt ?? raw.doneDate
+    const completedDate = completedValue === undefined ? undefined : validDate(completedValue)
+    if (completedValue !== undefined && !completedDate) {
+      throw new DriveDataError(`Task ${index + 1} has an invalid completion date.`)
+    }
+
+    return {
+      id,
+      title,
+      startDate,
+      createdAt,
+      updatedAt,
+      synced: true,
+      ...(typeof raw.backgroundColor === 'string' ? { backgroundColor: raw.backgroundColor } : {}),
+      ...(completedDate ? { completedDate } : {}),
+      ...(raw.isDeleted === true ? { isDeleted: true } : {}),
+    }
+  })
+}
+
+function cloudTasks(tasks: PendingTask[]): Omit<PendingTask, 'synced'>[] {
+  return tasks.map((task) => {
+    const cloudTask: Partial<PendingTask> = { ...task }
+    delete cloudTask.synced
+    return cloudTask as Omit<PendingTask, 'synced'>
+  })
+}
+
+function canonicalTasks(tasks: PendingTask[]): string {
+  return JSON.stringify(
+    cloudTasks(tasks)
+      .slice()
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .map((task) => ({
+        id: task.id,
+        title: task.title,
+        backgroundColor: task.backgroundColor ?? null,
+        startDate: task.startDate,
+        createdAt: task.createdAt,
+        updatedAt: task.updatedAt,
+        completedDate: task.completedDate ?? null,
+        isDeleted: task.isDeleted === true,
+      })),
+  )
+}
+
+async function initializeFile(getToken: TokenProvider, file: DriveFileMeta): Promise<DriveFileMeta> {
+  const uploadUrl =
+    `https://www.googleapis.com/upload/drive/v3/files/${file.id}` +
+    '?uploadType=media&fields=id,version,size,appProperties'
+  const upload = await requireOk(await driveFetch(getToken, uploadUrl, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: '[]',
+  }))
+  const uploaded = (await upload.json()) as DriveFileMeta
+
+  const metadataUrl =
+    `https://www.googleapis.com/drive/v3/files/${file.id}` +
+    '?fields=id,version,size,appProperties'
+  const metadata = await requireOk(await driveFetch(getToken, metadataUrl, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      appProperties: { app: 'ismailnow', purpose: 'primary-sync', initialization: 'ready' },
+    }),
+  }))
+  return { ...uploaded, ...((await metadata.json()) as DriveFileMeta) }
+}
+
+export async function getOrCreateDriveFile(getToken: TokenProvider): Promise<DriveFileMeta> {
+  if (cachedFile) return cachedFile
   if (resolveFilePromise) return resolveFilePromise
 
   resolveFilePromise = (async () => {
-    const files = await listDriveDataFiles(token)
+    const files = await listDriveDataFiles(getToken)
     if (files.length > 0) {
-      const id = files[0].id
-      localStorage.setItem(FILE_ID_KEY, id)
-      return id
+      const existing = files[0]
+      if (existing.appProperties?.initialization === 'pending') {
+        cachedFile = await initializeFile(getToken, existing)
+      } else {
+        cachedFile = existing
+      }
+      return cachedFile
     }
 
-    // Create a new file in Drive with an empty task array
-    const metadata = { name: DRIVE_FILE_NAME, mimeType: 'application/json' }
-    const form = new FormData()
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
-    form.append('file', new Blob([JSON.stringify([])], { type: 'application/json' }))
+    const createUrl =
+      'https://www.googleapis.com/drive/v3/files?fields=id,version,size,appProperties'
+    const create = await requireOk(await driveFetch(getToken, createUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: DRIVE_FILE_NAME,
+        mimeType: 'application/json',
+        appProperties: { app: 'ismailnow', purpose: 'primary-sync', initialization: 'pending' },
+      }),
+    }))
+    const created = (await create.json()) as DriveFileMeta
+    if (!created.id) throw new Error('Drive did not return an ID for the new sync file.')
 
-    const createRes = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
-      {
-        method: 'POST',
-        headers: { Authorization: authHeader(token) },
-        body: form,
-      },
-    )
-    if (!createRes.ok) {
-      const text = await createRes.text()
-      throw new Error('Drive API error ' + createRes.status + ': ' + text)
-    }
-    const created = (await createRes.json()) as { id: string }
-    localStorage.setItem(FILE_ID_KEY, created.id)
-    return created.id
+    cachedFile = await initializeFile(getToken, created)
+    return cachedFile
   })()
 
   try {
@@ -179,83 +266,90 @@ export async function getOrCreateDriveFile(token: string): Promise<string> {
   }
 }
 
-// ─── Read / write ─────────────────────────────────────────────────────────────
+async function readFile(getToken: TokenProvider, fileId: string): Promise<PendingTask[]> {
+  const url = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`
+  const response = await requireOk(await driveFetch(getToken, url))
+  return parseTasksDocument(await response.text())
+}
 
-/**
- * Download and parse the task list from Drive.
- * Returns an empty array if the file is missing or its content is invalid.
- */
-export async function loadTasksFromDrive(token: string): Promise<PendingTask[]> {
-  let files = await listDriveDataFiles(token)
+export async function loadTasksFromDrive(getToken: TokenProvider): Promise<DriveTasksSnapshot> {
+  let files = await listDriveDataFiles(getToken)
   if (files.length === 0) {
-    clearDriveCache()
-    await getOrCreateDriveFile(token)
-    files = await listDriveDataFiles(token)
+    const file = await getOrCreateDriveFile(getToken)
+    files = [file]
+  } else {
+    files = await Promise.all(files.map((file) =>
+      file.appProperties?.initialization === 'pending'
+        ? initializeFile(getToken, file)
+        : file,
+    ))
   }
-  if (files.length === 0) return []
 
-  localStorage.setItem(FILE_ID_KEY, files[0].id)
-
-  const snapshots = await Promise.all(
-    files.map(async ({ id }) => {
-      const res = await fetch(
-        'https://www.googleapis.com/drive/v3/files/' + id + '?alt=media',
-        { headers: { Authorization: authHeader(token) } },
-      )
-      if (res.status === 404) return [] as PendingTask[]
-      if (!res.ok) {
-        const text = await res.text()
-        throw new Error('Drive API error ' + res.status + ': ' + text)
-      }
-      const text = await res.text()
-      return parseTasksArray(text)
-    }),
-  )
-
+  const snapshots = await Promise.all(files.map(async (file) => ({
+    file,
+    tasks: await readFile(getToken, file.id),
+  })))
   const byId = new Map<string, PendingTask>()
-  for (const tasks of snapshots) {
-    for (const task of tasks) {
-      byId.set(task.id, task)
+  for (const snapshot of snapshots) {
+    for (const task of snapshot.tasks) {
+      const existing = byId.get(task.id)
+      if (!existing || task.updatedAt > existing.updatedAt) byId.set(task.id, task)
     }
   }
 
-  return Array.from(byId.values())
+  cachedFile = snapshots[0].file
+  return { file: snapshots[0].file, tasks: Array.from(byId.values()) }
 }
 
-/**
- * Upload the complete task list to Drive, overwriting the existing file.
- */
-export async function saveTasksToDrive(token: string, tasks: PendingTask[]): Promise<void> {
-  const attemptWrite = async (): Promise<Response> => {
-    const fileId = await getOrCreateDriveFile(token)
-    return fetch(
-      'https://www.googleapis.com/upload/drive/v3/files/' + fileId + '?uploadType=media',
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: authHeader(token),
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(tasks),
-      },
-    )
-  }
-
-  let res = await attemptWrite()
-  if (res.status === 404) {
-    clearDriveCache()
-    res = await attemptWrite()
-  }
-  if (!res.ok) {
-    const text = await res.text()
-    throw new Error('Drive API error ' + res.status + ': ' + text)
+async function getCurrentFile(
+  getToken: TokenProvider,
+  fileId: string,
+): Promise<{ file: DriveFileMeta; etag: string | null }> {
+  const url =
+    `https://www.googleapis.com/drive/v3/files/${fileId}` +
+    '?fields=id,version,size,appProperties'
+  const response = await requireOk(await driveFetch(getToken, url))
+  return {
+    file: (await response.json()) as DriveFileMeta,
+    etag: response.headers.get('etag'),
   }
 }
 
-/**
- * Clear the cached Drive file ID (call on sign-out so the next sign-in
- * re-discovers or re-creates the file).
- */
+export async function saveTasksToDrive(
+  getToken: TokenProvider,
+  tasks: PendingTask[],
+  base: DriveFileMeta,
+): Promise<DriveFileMeta> {
+  const current = await getCurrentFile(getToken, base.id)
+  if (current.file.version !== base.version) throw new DriveConflictError()
+
+  // Drive v3 does not guarantee a browser-visible ETag. When it is unavailable,
+  // the version check plus read-back verification is best-effort rather than CAS.
+  const url =
+    `https://www.googleapis.com/upload/drive/v3/files/${base.id}` +
+    '?uploadType=media&fields=id,version,size,appProperties'
+  const response = await driveFetch(getToken, url, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(current.etag ? { 'If-Match': current.etag } : {}),
+    },
+    body: JSON.stringify(cloudTasks(tasks)),
+  })
+  if (response.status === 412) throw new DriveConflictError()
+  await requireOk(response)
+  const updated = (await response.json()) as DriveFileMeta
+
+  const verified = await readFile(getToken, base.id)
+  if (canonicalTasks(verified) !== canonicalTasks(tasks)) {
+    throw new DriveConflictError('The Drive write was replaced before it could be verified.')
+  }
+
+  cachedFile = updated
+  return updated
+}
+
 export function clearDriveCache(): void {
-  localStorage.removeItem(FILE_ID_KEY)
+  cachedFile = null
+  resolveFilePromise = null
 }

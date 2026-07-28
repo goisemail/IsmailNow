@@ -9,9 +9,7 @@ export default function Settings() {
   const deleteHabit = useHabitsStore((state) => state.deleteHabit)
   const tasks = useTasksStore((state) => state.tasks)
   const deleteTask = useTasksStore((state) => state.deleteTask)
-
-  const { user } = useAuth()
-  const token = user?.accessToken ?? null
+  const { canSync, getAccessToken } = useAuth()
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
 
@@ -99,7 +97,7 @@ export default function Settings() {
                     className="btn btn-sm btn-danger"
                     onClick={() =>
                       confirmDelete === task.id
-                        ? (deleteTask(task.id, token), setConfirmDelete(null))
+                        ? (deleteTask(task.id, canSync ? getAccessToken : null), setConfirmDelete(null))
                         : setConfirmDelete(task.id)
                     }
                     data-testid={`delete-task-${task.id}`}

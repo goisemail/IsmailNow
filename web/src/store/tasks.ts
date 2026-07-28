@@ -1,7 +1,12 @@
 import { create } from 'zustand'
-import { loadTasksFromDrive, saveTasksToDrive } from '../lib/googleDrive'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
+import { accountStorageKey } from '../lib/accountStorage'
+import {
+  DriveConflictError,
+  DriveDataError,
+  loadTasksFromDrive,
+  saveTasksToDrive,
+  type TokenProvider,
+} from '../lib/googleDrive'
 
 export interface PendingTask {
   id: string
@@ -9,85 +14,40 @@ export interface PendingTask {
   backgroundColor?: string
   startDate: string
   createdAt: string
-  /**
-   * ISO timestamp of the last local mutation. Used as the authoritative
-   * version indicator when merging task copies from different devices.
-   */
   updatedAt: string
   completedDate?: string
-  /**
-   * Soft-delete tombstone. When true the task is hidden from the UI but kept
-   * in the data set so the deletion propagates to every device on next sync.
-   */
   isDeleted?: boolean
-  /**
-   * true  = this task has been flushed to the user's Drive file.
-   * false = only in localStorage; will be included in the next Drive flush.
-   */
   synced: boolean
 }
 
 interface TasksStore {
+  ownerId: string | null
   tasks: PendingTask[]
   loading: boolean
   error: string | null
-  /** Load tasks from localStorage into memory (called on app start). */
-  load: () => void
-  /** Clear local task storage and in-memory state. */
-  reset: () => void
-  /**
-   * Load tasks from Drive and merge with any local un-synced tasks.
-   * Falls back to local-only when offline or unauthenticated.
-   */
-  fetchForDate: (date: string, token: string | null) => Promise<void>
-  /** Add a task — writes to localStorage immediately; Drive flush is periodic. */
-  addTask: (title: string, startDate: string, token: string | null) => Promise<void>
-  /** Rename a task locally; the next Drive flush will propagate the edit. */
+  load: (ownerId: string) => void
+  clearMemory: () => void
+  hasPendingChanges: () => boolean
+  fetchForDate: (date: string, getToken: TokenProvider | null) => Promise<void>
+  addTask: (title: string, startDate: string) => Promise<void>
   updateTaskTitle: (id: string, title: string) => void
-  /**
-   * Mark a task complete on `date`. The task will no longer appear on future
-   * dates after `date`.
-   */
-  markComplete: (id: string, date: string, token: string | null) => Promise<void>
-  /** Undo a completion (toggle off). */
-  unmarkComplete: (id: string, token: string | null) => void
-  /**
-   * Soft-delete a task: marks isDeleted=true and immediately uploads to Drive
-   * so the deletion propagates to other devices before any stale sync can
-   * resurrect the task.
-   */
-  deleteTask: (id: string, token: string | null) => Promise<void>
-  /**
-   * Upload the full task list to Drive.
-   * Called periodically by the useDriveSync hook and on tab hide / sign-out.
-   */
-  flushToDrive: (token: string) => Promise<void>
-  /** Manual bi-directional sync: merge local+Drive and persist merged result to both. */
-  syncWithDrive: (token: string) => Promise<void>
+  markComplete: (id: string, date: string) => Promise<void>
+  unmarkComplete: (id: string) => void
+  deleteTask: (id: string, getToken?: TokenProvider | null) => Promise<void>
+  flushToDrive: (getToken: TokenProvider) => Promise<void>
+  syncWithDrive: (getToken: TokenProvider) => Promise<void>
 }
 
-// ─── Storage keys ─────────────────────────────────────────────────────────────
-
-const TASKS_KEY = 'ismailnow_tasks_v1'
 const TASK_COLORS = ['#E7F5FF', '#FFF4E6', '#FFF0F6', '#EBFBEE', '#F8F0FC', '#FFF9DB']
+const MAX_CONFLICT_RETRIES = 3
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function loadFromStorage(): PendingTask[] {
-  try {
-    const raw = localStorage.getItem(TASKS_KEY)
-    return raw ? (JSON.parse(raw) as PendingTask[]) : []
-  } catch {
-    return []
-  }
+function loadFromStorage(ownerId: string): PendingTask[] {
+  const raw = localStorage.getItem(accountStorageKey(ownerId, 'tasks'))
+  return raw ? (JSON.parse(raw) as PendingTask[]) : []
 }
 
-function saveToStorage(tasks: PendingTask[]): void {
-  try {
-    localStorage.setItem(TASKS_KEY, JSON.stringify(tasks))
-  } catch {
-    // Storage full — ignore
-  }
+function saveToStorage(ownerId: string, tasks: PendingTask[]): void {
+  localStorage.setItem(accountStorageKey(ownerId, 'tasks'), JSON.stringify(tasks))
 }
 
 function generateId(): string {
@@ -96,8 +56,8 @@ function generateId(): string {
 
 function pickTaskColor(id: string): string {
   let hash = 0
-  for (let i = 0; i < id.length; i += 1) {
-    hash = (hash * 31 + id.charCodeAt(i)) >>> 0
+  for (let offset = 0; offset < id.length; offset += 1) {
+    hash = (hash * 31 + id.charCodeAt(offset)) >>> 0
   }
   return TASK_COLORS[hash % TASK_COLORS.length]
 }
@@ -106,70 +66,32 @@ function normalizeTask(task: PendingTask): PendingTask {
   return {
     ...task,
     backgroundColor: task.backgroundColor ?? pickTaskColor(task.id),
-    // Back-fill updatedAt for tasks created before this field was introduced.
     updatedAt: task.updatedAt || task.createdAt || new Date().toISOString(),
+    synced: task.synced !== false,
   }
 }
 
 function mergeTaskPair(base: PendingTask, incoming: PendingTask): PendingTask {
-  // When both copies carry an updatedAt timestamp, the newer one wins outright.
-  // This correctly propagates soft-deletes, edits, and completions across devices.
-  if (base.updatedAt && incoming.updatedAt) {
-    const winner = base.updatedAt >= incoming.updatedAt ? base : incoming
-    const loser  = base.updatedAt >= incoming.updatedAt ? incoming : base
-    return normalizeTask({
-      ...loser,
-      ...winner,
-      synced: base.synced && incoming.synced,
-    })
-  }
-
-  // Legacy fallback for tasks that pre-date the updatedAt field.
-  // Prefer local unsynced changes over remote snapshot when both share the same id.
-  if (incoming.synced === false && base.synced !== false) {
-    return normalizeTask({ ...base, ...incoming })
-  }
-  if (base.synced === false && incoming.synced !== false) {
-    return normalizeTask({ ...incoming, ...base })
-  }
-  // If both are unsynced or both synced, preserve completion when either side has it.
-  const completedDate =
-    base.completedDate && incoming.completedDate
-      ? (base.completedDate > incoming.completedDate ? base.completedDate : incoming.completedDate)
-      : (base.completedDate ?? incoming.completedDate)
+  const winner = base.updatedAt >= incoming.updatedAt ? base : incoming
   return normalizeTask({
-    ...base,
-    ...incoming,
-    completedDate,
+    ...winner,
     synced: base.synced && incoming.synced,
   })
 }
 
-function mergeTasks(localTasks: PendingTask[], driveTasks: PendingTask[]): PendingTask[] {
+export function mergeTasks(localTasks: PendingTask[], driveTasks: PendingTask[]): PendingTask[] {
   const byId = new Map<string, PendingTask>()
 
-  for (const task of driveTasks) {
-    byId.set(task.id, normalizeTask({ ...task, synced: true }))
-  }
-
+  for (const task of driveTasks) byId.set(task.id, normalizeTask({ ...task, synced: true }))
   for (const task of localTasks) {
     const localTask = normalizeTask(task)
     const existing = byId.get(localTask.id)
-    if (!existing) {
-      byId.set(localTask.id, localTask)
-      continue
-    }
-    byId.set(localTask.id, mergeTaskPair(existing, localTask))
+    byId.set(localTask.id, existing ? mergeTaskPair(existing, localTask) : localTask)
   }
 
-  return Array.from(byId.values()).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  return Array.from(byId.values()).sort((left, right) => left.createdAt.localeCompare(right.createdAt))
 }
 
-/**
- * Determines whether a task should be visible on a given date:
- *   not soft-deleted  AND  created on or before the date  AND
- *   not yet completed (or completed on/after the date)
- */
 export function taskVisibleOnDate(task: PendingTask, date: string): boolean {
   return (
     !task.isDeleted &&
@@ -178,165 +100,224 @@ export function taskVisibleOnDate(task: PendingTask, date: string): boolean {
   )
 }
 
-// ─── Store ────────────────────────────────────────────────────────────────────
+export const useTasksStore = create<TasksStore>((set, get) => {
+  interface SyncRun {
+    generation: number
+    followUpRequested: boolean
+    promise: Promise<void>
+  }
 
-export const useTasksStore = create<TasksStore>((set) => ({
-  tasks: [],
-  loading: false,
-  error: null,
+  let syncGeneration = 0
+  let activeRun: SyncRun | null = null
 
-  load: () => {
-    set({ tasks: loadFromStorage().map(normalizeTask) })
-  },
-
-  reset: () => {
+  const persist = (ownerId: string, tasks: PendingTask[]): string | null => {
     try {
-      localStorage.removeItem(TASKS_KEY)
+      saveToStorage(ownerId, tasks)
+      return null
     } catch {
-      // Ignore storage errors while clearing state.
+      return 'Changes could not be saved in this browser.'
     }
-    set({ tasks: [], loading: false, error: null })
-  },
+  }
 
-  fetchForDate: async (_date, token) => {
-    set({ loading: true, error: null })
-    try {
-      if (token) {
-        const driveTasks = await loadTasksFromDrive(token)
-        const localTasks = loadFromStorage()
-        const merged = mergeTasks(localTasks, driveTasks)
+  const syncOnce = async (getToken: TokenProvider, generation: number): Promise<boolean> => {
+    const ownerId = get().ownerId
+    if (!ownerId || generation !== syncGeneration) return false
 
-        saveToStorage(merged)
-        set({ tasks: merged, loading: false })
-      } else {
-        // Offline / not authenticated — use local tasks only
-        const local = loadFromStorage()
-        set({ tasks: local, loading: false })
+    for (let attempt = 0; attempt < MAX_CONFLICT_RETRIES; attempt += 1) {
+      const localSnapshot = get().tasks.map(normalizeTask)
+      const remote = await loadTasksFromDrive(getToken)
+      const merged = mergeTasks(localSnapshot, remote.tasks).map((task) => ({ ...task, synced: true }))
+
+      try {
+        await saveTasksToDrive(getToken, merged, remote.file)
+      } catch (error) {
+        if (error instanceof DriveConflictError && attempt + 1 < MAX_CONFLICT_RETRIES) continue
+        throw error
       }
-    } catch (err) {
-      console.error('fetchForDate failed:', err)
-      // Fall back to local storage so UI is never empty
-      const local = loadFromStorage()
-      set({ tasks: local, loading: false, error: 'Could not reach Google Drive' })
-    }
-  },
 
-  addTask: async (title, startDate, _token) => {
-    const id = generateId()
-    const now = new Date().toISOString()
-    const newTask: PendingTask = {
-      id,
-      title,
-      backgroundColor: pickTaskColor(id),
-      startDate,
-      createdAt: now,
-      updatedAt: now,
-      synced: false,
+      if (get().ownerId !== ownerId || generation !== syncGeneration) return false
+
+      const latest = get().tasks.map(normalizeTask)
+      const uploadedById = new Map(merged.map((task) => [task.id, task]))
+      const latestById = new Map(latest.map((task) => [task.id, task]))
+      const reconciled = mergeTasks(latest, merged).map((task) => {
+        const uploaded = uploadedById.get(task.id)
+        const current = latestById.get(task.id)
+        const changedDuringSync = Boolean(current && (!uploaded || current.updatedAt !== uploaded.updatedAt))
+        return { ...task, synced: !changedDuringSync }
+      })
+      const persistenceError = persist(ownerId, reconciled)
+      set({ tasks: reconciled, error: persistenceError })
+
+      return reconciled.some((task) => !task.synced)
+    }
+    return false
+  }
+
+  const requestSync = (getToken: TokenProvider): Promise<void> => {
+    if (activeRun?.generation === syncGeneration) {
+      activeRun.followUpRequested = true
+      return activeRun.promise
     }
 
-    // Write locally immediately for instant UI; Drive flush is periodic
+    const run: SyncRun = {
+      generation: syncGeneration,
+      followUpRequested: true,
+      promise: Promise.resolve(),
+    }
+    run.promise = (async () => {
+      try {
+        do {
+          run.followUpRequested = false
+          if (await syncOnce(getToken, run.generation)) run.followUpRequested = true
+        } while (run.followUpRequested && run.generation === syncGeneration)
+      } finally {
+        if (activeRun === run) activeRun = null
+      }
+    })()
+    activeRun = run
+    return run.promise
+  }
+
+  const updateLocal = (transform: (tasks: PendingTask[]) => PendingTask[]): void => {
     set((state) => {
-      const updated = [...state.tasks, newTask]
-      saveToStorage(updated)
-      return { tasks: updated }
+      if (!state.ownerId) return state
+      const tasks = transform(state.tasks)
+      return { tasks, error: persist(state.ownerId, tasks) }
     })
-  },
+  }
 
-  updateTaskTitle: (id, title) => {
-    const cleanTitle = title.trim()
-    if (!cleanTitle) return
+  return {
+    ownerId: null,
+    tasks: [],
+    loading: false,
+    error: null,
 
-    set((state) => {
-      const updated = state.tasks.map((task) =>
+    load: (ownerId) => {
+      syncGeneration += 1
+      activeRun = null
+      try {
+        set({
+          ownerId,
+          tasks: loadFromStorage(ownerId).map(normalizeTask),
+          loading: false,
+          error: null,
+        })
+      } catch {
+        set({ ownerId, tasks: [], loading: false, error: 'Saved tasks could not be loaded.' })
+      }
+    },
+
+    clearMemory: () => {
+      syncGeneration += 1
+      activeRun = null
+      set({ ownerId: null, tasks: [], loading: false, error: null })
+    },
+
+    hasPendingChanges: () => get().tasks.some((task) => !task.synced),
+
+    fetchForDate: async (_date, getToken) => {
+      if (!getToken) return
+      set({ loading: true, error: null })
+      try {
+        await requestSync(getToken)
+        set({ loading: false })
+      } catch (error) {
+        const message = error instanceof DriveDataError
+          ? 'Cloud sync is blocked because the Drive file is damaged.'
+          : 'Could not reach Google Drive.'
+        set({ loading: false, error: message })
+      }
+    },
+
+    addTask: async (title, startDate) => {
+      const id = generateId()
+      const now = new Date().toISOString()
+      const task: PendingTask = {
+        id,
+        title,
+        backgroundColor: pickTaskColor(id),
+        startDate,
+        createdAt: now,
+        updatedAt: now,
+        synced: false,
+      }
+      updateLocal((tasks) => [...tasks, task])
+    },
+
+    updateTaskTitle: (id, title) => {
+      const cleanTitle = title.trim()
+      if (!cleanTitle) return
+      updateLocal((tasks) => tasks.map((task) =>
         task.id === id
           ? { ...task, title: cleanTitle, updatedAt: new Date().toISOString(), synced: false }
           : task,
-      )
-      saveToStorage(updated)
-      return { tasks: updated }
-    })
-  },
+      ))
+    },
 
-  markComplete: async (id, date, _token) => {
-    set((state) => {
-      const updated = state.tasks.map((t) =>
-        t.id === id
-          ? { ...t, completedDate: date, updatedAt: new Date().toISOString(), synced: false }
-          : t,
-      )
-      saveToStorage(updated)
-      return { tasks: updated }
-    })
-  },
+    markComplete: async (id, date) => {
+      updateLocal((tasks) => tasks.map((task) =>
+        task.id === id
+          ? { ...task, completedDate: date, updatedAt: new Date().toISOString(), synced: false }
+          : task,
+      ))
+    },
 
-  unmarkComplete: (id, _token) => {
-    set((state) => {
-      const updated = state.tasks.map((t) =>
-        t.id === id
-          ? { ...t, completedDate: undefined, updatedAt: new Date().toISOString(), synced: false }
-          : t,
-      )
-      saveToStorage(updated)
-      return { tasks: updated }
-    })
-  },
+    unmarkComplete: (id) => {
+      updateLocal((tasks) => tasks.map((task) =>
+        task.id === id
+          ? { ...task, completedDate: undefined, updatedAt: new Date().toISOString(), synced: false }
+          : task,
+      ))
+    },
 
-  deleteTask: async (id, token) => {
-    const now = new Date().toISOString()
-    let snapshot: PendingTask[] = []
-
-    set((state) => {
-      const updated = state.tasks.map((t) =>
-        t.id === id
-          ? { ...t, isDeleted: true, updatedAt: now, synced: false }
-          : t,
-      )
-      saveToStorage(updated)
-      snapshot = updated
-      return { tasks: updated }
-    })
-
-    // Immediately push to Drive so other devices receive the tombstone before
-    // they can sync stale data back.
-    if (token) {
-      try {
-        await saveTasksToDrive(token, snapshot.map((task) => ({ ...task, synced: true })))
-        const synced = snapshot.map((task) => ({ ...task, synced: true }))
-        saveToStorage(synced)
-        set({ tasks: synced })
-      } catch (err) {
-        console.error('deleteTask: immediate Drive upload failed:', err)
-        // Not fatal — the local tombstone is saved; the next periodic flush will retry.
+    deleteTask: async (id, getToken) => {
+      const now = new Date().toISOString()
+      updateLocal((tasks) => tasks.map((task) =>
+        task.id === id
+          ? { ...task, isDeleted: true, updatedAt: now, synced: false }
+          : task,
+      ))
+      if (getToken && navigator.onLine) {
+        try {
+          await requestSync(getToken)
+        } catch (error) {
+          set({
+            error: error instanceof DriveDataError
+              ? 'Cloud sync is blocked because the Drive file is damaged.'
+              : 'The deletion is saved locally and will retry syncing later.',
+          })
+        }
       }
-    }
-  },
+    },
 
-  flushToDrive: async (token) => {
-    try {
-      const driveTasks = await loadTasksFromDrive(token)
-      const localTasks = loadFromStorage().map(normalizeTask)
-      const merged = mergeTasks(localTasks, driveTasks).map((task) => ({ ...task, synced: true }))
-      await saveTasksToDrive(token, merged)
-      saveToStorage(merged)
-      set({ tasks: merged })
-    } catch (err) {
-      console.error('flushToDrive failed:', err)
-    }
-  },
+    flushToDrive: async (getToken) => {
+      try {
+        await requestSync(getToken)
+      } catch (error) {
+        set({
+          error: error instanceof DriveDataError
+            ? 'Cloud sync is blocked because the Drive file is damaged.'
+            : 'Cloud sync failed.',
+        })
+        throw error
+      }
+    },
 
-  syncWithDrive: async (token) => {
-    set({ loading: true, error: null })
-    try {
-      const driveTasks = await loadTasksFromDrive(token)
-      const localTasks = loadFromStorage()
-      const merged = mergeTasks(localTasks, driveTasks).map((task) => ({ ...task, synced: true }))
-      await saveTasksToDrive(token, merged)
-      saveToStorage(merged)
-      set({ tasks: merged, loading: false })
-    } catch (err) {
-      console.error('syncWithDrive failed:', err)
-      set({ loading: false, error: 'Cloud sync failed' })
-      throw err
-    }
-  },
-}))
+    syncWithDrive: async (getToken) => {
+      set({ loading: true, error: null })
+      try {
+        await requestSync(getToken)
+        set({ loading: false })
+      } catch (error) {
+        set({
+          loading: false,
+          error: error instanceof DriveDataError
+            ? 'Cloud sync is blocked because the Drive file is damaged.'
+            : 'Cloud sync failed.',
+        })
+        throw error
+      }
+    },
+  }
+})

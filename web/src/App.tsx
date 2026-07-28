@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useHabitsStore } from './store/habits'
 import { useTasksStore } from './store/tasks'
@@ -31,11 +31,19 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 // ─── App shell ────────────────────────────────────────────────────────────────
 
 function AppContent() {
-  const loadHabits = useHabitsStore((state) => state.load)
-  const loadTasks = useTasksStore((state) => state.load)
   const syncWithDrive = useTasksStore((state) => state.syncWithDrive)
+  const taskError = useTasksStore((state) => state.error)
+  const habitError = useHabitsStore((state) => state.error)
 
-  const { user, signOut } = useAuth()
+  const {
+    user,
+    authError,
+    reauthRequired,
+    canSync,
+    signIn,
+    signOut,
+    getAccessToken,
+  } = useAuth()
   const isOnline = useOnlineStatus()
 
   // Set up periodic Drive flush, visibilitychange, and online-recovery flush
@@ -48,14 +56,8 @@ function AppContent() {
   const location = useLocation()
   const navigate = useNavigate()
 
-  // Load local data on mount
-  useEffect(() => {
-    loadHabits()
-    loadTasks()
-  }, [])
-
   const handleManualSync = async () => {
-    if (!user?.accessToken) {
+    if (!canSync) {
       alert('Cloud sync is available only when signed in with Google.')
       return
     }
@@ -63,7 +65,7 @@ function AppContent() {
 
     setSyncing(true)
     try {
-      await syncWithDrive(user.accessToken)
+      await syncWithDrive(getAccessToken)
       alert('Cloud sync completed.')
       setSidebarOpen(false)
     } catch {
@@ -73,15 +75,17 @@ function AppContent() {
     }
   }
 
-  const handleLogout = () => {
-    signOut()
+  const handleLogout = async () => {
+    const signedOut = await signOut()
+    if (!signedOut) return
     setSidebarOpen(false)
     navigate('/login', { replace: true })
   }
 
   const handleHeaderLogin = () => {
     if (user?.isGuest) {
-      signOut()
+      signIn()
+      return
     }
     setSidebarOpen(false)
     navigate('/login')
@@ -92,7 +96,12 @@ function AppContent() {
       {/* Offline banner */}
       {!isOnline && (
         <div className="offline-banner" role="status">
-          📵 Offline — changes will sync when reconnected
+          📵 Offline — task changes will sync when reconnected
+        </div>
+      )}
+      {(authError || taskError || habitError || reauthRequired) && (
+        <div className="offline-banner" role="alert">
+          {authError ?? taskError ?? habitError ?? 'Cloud sync needs Google authorization.'}
         </div>
       )}
 
@@ -131,7 +140,7 @@ function AppContent() {
         onSyncToCloud={handleManualSync}
         onLogout={handleLogout}
         syncing={syncing}
-        canSync={Boolean(user?.accessToken)}
+        canSync={canSync}
         canLogout={Boolean(user)}
       />
 
