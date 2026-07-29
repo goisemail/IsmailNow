@@ -89,7 +89,7 @@ export function DashboardWeekNavigator({
 }
 
 export default function Dashboard({ selectedDate }: DashboardProps) {
-  const habits = useHabitsStore((state) => state.habits)
+  const habits = useHabitsStore((state) => state.habits.filter((habit) => !habit.isDeleted))
   const logCompletion = useHabitsStore((state) => state.logCompletion)
 
   const tasks = useTasksStore((state) => state.tasks)

@@ -7,10 +7,10 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import { accountOwnerId, migrateLegacyStorage } from '../lib/accountStorage'
+import { accountOwnerId, accountStorageKey, migrateLegacyStorage } from '../lib/accountStorage'
 import { clearDriveCache, type TokenProvider } from '../lib/googleDrive'
-import { useHabitsStore } from '../store/habits'
-import { useTasksStore } from '../store/tasks'
+import { mergeHabits, useHabitsStore, type Habit } from '../store/habits'
+import { mergeTasks, useTasksStore, type PendingTask } from '../store/tasks'
 
 export interface AppUser {
   uid: string
@@ -42,6 +42,7 @@ interface AuthContextValue {
   signIn: () => void
   signInGuest: () => void
   signOut: () => Promise<boolean>
+  reauthorize: () => Promise<boolean>
   getAccessToken: TokenProvider
 }
 
@@ -85,6 +86,20 @@ function clearActiveAccount(): void {
   clearDriveCache()
 }
 
+function exportCurrentMemory(): void {
+  const payload = JSON.stringify({
+    exportedAt: new Date().toISOString(),
+    tasks: useTasksStore.getState().tasks,
+    habits: useHabitsStore.getState().habits,
+  }, null, 2)
+  const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `ismailnow-unsaved-${new Date().toISOString().slice(0, 10)}.json`
+  link.click()
+  URL.revokeObjectURL(url)
+}
+
 async function fetchGoogleProfile(accessToken: string): Promise<GoogleProfile> {
   const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
     headers: { Authorization: `Bearer ${accessToken}` },
@@ -115,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const tokenRef = useRef<TokenState | null>(null)
   const tokenRequestRef = useRef<Promise<TokenState> | null>(null)
   const authGenerationRef = useRef(0)
+  const discardGuestAfterSwitchRef = useRef(false)
 
   useEffect(() => {
     try {
@@ -134,6 +150,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } finally {
       setLoading(false)
     }
+  }, [])
+
+  useEffect(() => {
+    const requireReauthorization = () => {
+      tokenRef.current = null
+      setReauthRequired(true)
+    }
+    window.addEventListener('ismailnow:reauth-required', requireReauthorization)
+    return () => window.removeEventListener('ismailnow:reauth-required', requireReauthorization)
   }, [])
 
   const requestAccessToken = useCallback((prompt = ''): Promise<TokenState> => {
@@ -232,6 +257,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const allowVolatileTransition = (): boolean => {
+    const tasks = useTasksStore.getState()
+    const habits = useHabitsStore.getState()
+    if (!tasks.hasVolatileChanges() && !habits.hasVolatileChanges()) return true
+
+    const persisted = tasks.retryPersistence() && habits.retryPersistence()
+    if (persisted) return true
+
+    const choice = window.prompt(
+      'Some changes exist only in memory. Type EXPORT to download them, DISCARD to continue and lose them, or CANCEL to stay here.',
+      'CANCEL',
+    )?.trim().toUpperCase()
+    if (choice === 'EXPORT') {
+      exportCurrentMemory()
+      return false
+    }
+    if (choice === 'DISCARD') {
+      return window.confirm('Discard changes that could not be saved? This cannot be undone.')
+    }
+    return false
+  }
+
+  const prepareGuestTransition = (profile: AppUser): boolean => {
+    if (!user?.isGuest) return true
+    const guestTasks = useTasksStore.getState().tasks
+    const guestHabits = useHabitsStore.getState().habits
+    if (guestTasks.length === 0 && guestHabits.length === 0) return true
+
+    const choice = window.prompt(
+      'Guest data found. Type MERGE to copy it to Google, KEEP to leave it separate, EXPORT to download it, or DISCARD to remove it.',
+      'MERGE',
+    )?.trim().toUpperCase()
+    if (choice === 'EXPORT') {
+      exportCurrentMemory()
+      return false
+    }
+    if (choice === 'KEEP') {
+      discardGuestAfterSwitchRef.current = false
+      return true
+    }
+    if (choice === 'DISCARD') {
+      if (!window.confirm('Permanently remove guest data from this device?')) return false
+      discardGuestAfterSwitchRef.current = true
+      return true
+    }
+    if (choice !== 'MERGE') return false
+
+    try {
+      const targetOwner = accountOwnerId(profile.uid)
+      const targetTasks = JSON.parse(
+        localStorage.getItem(accountStorageKey(targetOwner, 'tasks')) ?? '[]',
+      ) as PendingTask[]
+      const targetHabits = JSON.parse(
+        localStorage.getItem(accountStorageKey(targetOwner, 'habits')) ?? '[]',
+      ) as Habit[]
+      const mergedTasks = mergeTasks(
+        guestTasks.map((task) => ({ ...task, synced: false })),
+        targetTasks,
+      )
+      const mergedHabits = mergeHabits(
+        guestHabits.map((habit) => ({ ...habit, synced: false })),
+        targetHabits,
+      )
+      localStorage.setItem(accountStorageKey(targetOwner, 'tasks'), JSON.stringify(mergedTasks))
+      localStorage.setItem(accountStorageKey(targetOwner, 'habits'), JSON.stringify(mergedHabits))
+      discardGuestAfterSwitchRef.current = false
+      return true
+    } catch {
+      setAuthError('Guest data could not be copied. Nothing was removed; please retry or export it.')
+      return false
+    }
+  }
+
   const signIn = () => {
     const generation = authGenerationRef.current + 1
     authGenerationRef.current = generation
@@ -250,10 +348,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ...(typeof profile.picture === 'string' ? { photoUrl: profile.picture } : {}),
         }
 
+        if (!allowVolatileTransition() || !prepareGuestTransition(newUser)) return
         persistAndActivateAccount(newUser)
         tokenRef.current = { ...requestedToken, ownerUid: newUser.uid }
         setReauthRequired(false)
         setUser(newUser)
+        if (discardGuestAfterSwitchRef.current) {
+          try {
+            localStorage.removeItem(accountStorageKey('guest:local', 'tasks'))
+            localStorage.removeItem(accountStorageKey('guest:local', 'habits'))
+          } finally {
+            discardGuestAfterSwitchRef.current = false
+          }
+        }
       } catch (error) {
         if (generation !== authGenerationRef.current) return
         setAuthError(error instanceof Error ? error.message : 'Google sign-in failed.')
@@ -262,6 +369,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signInGuest = () => {
+    if (!allowVolatileTransition()) return
     authGenerationRef.current += 1
     tokenRef.current = null
     const guest: AppUser = { uid: 'guest', name: 'Guest', isGuest: true }
@@ -275,6 +383,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const signOut = async (): Promise<boolean> => {
+    if (!allowVolatileTransition()) return false
     authGenerationRef.current += 1
     if (user && !user.isGuest && useTasksStore.getState().hasPendingChanges() && navigator.onLine) {
       try {
@@ -308,6 +417,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return true
   }
 
+  const reauthorize = async (): Promise<boolean> => {
+    if (!user || user.isGuest) return false
+    const generation = authGenerationRef.current
+    try {
+      const requestedToken = await requestAccessToken('consent')
+      const profile = await fetchGoogleProfile(requestedToken.accessToken)
+      if (generation !== authGenerationRef.current || profile.sub !== user.uid) {
+        throw new Error('Google authorization belongs to a different account.')
+      }
+      tokenRef.current = { ...requestedToken, ownerUid: user.uid }
+      setReauthRequired(false)
+      setAuthError(null)
+      return true
+    } catch (error) {
+      setReauthRequired(true)
+      setAuthError(error instanceof Error ? error.message : 'Google Drive reconnection failed.')
+      return false
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -319,6 +448,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signInGuest,
         signOut,
+        reauthorize,
         getAccessToken,
       }}
     >

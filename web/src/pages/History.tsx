@@ -14,7 +14,7 @@ const locales = { 'en-US': enUS }
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales })
 
 export default function History() {
-  const habits = useHabitsStore((state) => state.habits)
+  const habits = useHabitsStore((state) => state.habits.filter((habit) => !habit.isDeleted))
   const tasks = useTasksStore((state) => state.tasks)
   const [calendarMode, setCalendarMode] = useState<'day' | 'week' | 'month'>('month')
 

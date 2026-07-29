@@ -4,9 +4,11 @@ import {
   DriveConflictError,
   DriveDataError,
   loadTasksFromDrive,
+  restoreDriveBackup,
   saveTasksToDrive,
   type TokenProvider,
 } from '../lib/googleDrive'
+import { mergeHabits, useHabitsStore } from './habits'
 
 export interface PendingTask {
   id: string
@@ -17,6 +19,7 @@ export interface PendingTask {
   updatedAt: string
   completedDate?: string
   isDeleted?: boolean
+  deletedAt?: string
   synced: boolean
 }
 
@@ -25,9 +28,12 @@ interface TasksStore {
   tasks: PendingTask[]
   loading: boolean
   error: string | null
+  volatile: boolean
   load: (ownerId: string) => void
   clearMemory: () => void
   hasPendingChanges: () => boolean
+  hasVolatileChanges: () => boolean
+  retryPersistence: () => boolean
   fetchForDate: (date: string, getToken: TokenProvider | null) => Promise<void>
   addTask: (title: string, startDate: string) => Promise<void>
   updateTaskTitle: (id: string, title: string) => void
@@ -36,6 +42,7 @@ interface TasksStore {
   deleteTask: (id: string, getToken?: TokenProvider | null) => Promise<void>
   flushToDrive: (getToken: TokenProvider) => Promise<void>
   syncWithDrive: (getToken: TokenProvider) => Promise<void>
+  restoreBackup: (getToken: TokenProvider, backupId: string) => Promise<void>
 }
 
 const TASK_COLORS = ['#E7F5FF', '#FFF4E6', '#FFF0F6', '#EBFBEE', '#F8F0FC', '#FFF9DB']
@@ -110,12 +117,12 @@ export const useTasksStore = create<TasksStore>((set, get) => {
   let syncGeneration = 0
   let activeRun: SyncRun | null = null
 
-  const persist = (ownerId: string, tasks: PendingTask[]): string | null => {
+  const persist = (ownerId: string, tasks: PendingTask[]): boolean => {
     try {
       saveToStorage(ownerId, tasks)
-      return null
+      return true
     } catch {
-      return 'Changes could not be saved in this browser.'
+      return false
     }
   }
 
@@ -125,19 +132,40 @@ export const useTasksStore = create<TasksStore>((set, get) => {
 
     for (let attempt = 0; attempt < MAX_CONFLICT_RETRIES; attempt += 1) {
       const localSnapshot = get().tasks.map(normalizeTask)
+      const localHabits = useHabitsStore.getState().habits
       const remote = await loadTasksFromDrive(getToken)
       const merged = mergeTasks(localSnapshot, remote.tasks).map((task) => ({ ...task, synced: true }))
+      const mergedHabits = mergeHabits(localHabits, remote.habits ?? []).map((habit) => ({
+        ...habit,
+        synced: true,
+      }))
 
       try {
-        await saveTasksToDrive(getToken, merged, remote.file)
+        await saveTasksToDrive(
+          getToken,
+          merged,
+          remote.file,
+          mergedHabits,
+          remote.duplicateFileIds ?? [],
+          remote.contentFingerprint,
+          true,
+          remote.requiresCanonicalMigration ?? false,
+        )
       } catch (error) {
-        if (error instanceof DriveConflictError && attempt + 1 < MAX_CONFLICT_RETRIES) continue
+        if (error instanceof DriveConflictError && attempt + 1 < MAX_CONFLICT_RETRIES) {
+          await new Promise((resolve) => {
+            const delay = 50 * 2 ** attempt + Math.floor(Math.random() * 25)
+            setTimeout(resolve, delay)
+          })
+          continue
+        }
         throw error
       }
 
       if (get().ownerId !== ownerId || generation !== syncGeneration) return false
 
       const latest = get().tasks.map(normalizeTask)
+      const latestHabits = useHabitsStore.getState().habits
       const uploadedById = new Map(merged.map((task) => [task.id, task]))
       const latestById = new Map(latest.map((task) => [task.id, task]))
       const reconciled = mergeTasks(latest, merged).map((task) => {
@@ -146,10 +174,25 @@ export const useTasksStore = create<TasksStore>((set, get) => {
         const changedDuringSync = Boolean(current && (!uploaded || current.updatedAt !== uploaded.updatedAt))
         return { ...task, synced: !changedDuringSync }
       })
-      const persistenceError = persist(ownerId, reconciled)
-      set({ tasks: reconciled, error: persistenceError })
+      const persisted = persist(ownerId, reconciled)
+      set({
+        tasks: reconciled,
+        volatile: !persisted,
+        error: persisted ? null : 'Changes could not be saved in this browser.',
+      })
 
-      return reconciled.some((task) => !task.synced)
+      const uploadedHabits = new Map(mergedHabits.map((habit) => [habit.id, habit]))
+      const latestHabitsById = new Map(latestHabits.map((habit) => [habit.id, habit]))
+      const reconciledHabits = mergeHabits(latestHabits, mergedHabits).map((habit) => {
+        const uploaded = uploadedHabits.get(habit.id)
+        const current = latestHabitsById.get(habit.id)
+        const changedDuringSync = Boolean(current && (!uploaded || current.updatedAt !== uploaded.updatedAt))
+        return { ...habit, synced: !changedDuringSync }
+      })
+      useHabitsStore.getState().applySyncResult(reconciledHabits)
+
+      return reconciled.some((task) => !task.synced) ||
+        reconciledHabits.some((habit) => !habit.synced)
     }
     return false
   }
@@ -165,7 +208,7 @@ export const useTasksStore = create<TasksStore>((set, get) => {
       followUpRequested: true,
       promise: Promise.resolve(),
     }
-    run.promise = (async () => {
+    const drain = async () => {
       try {
         do {
           run.followUpRequested = false
@@ -174,7 +217,11 @@ export const useTasksStore = create<TasksStore>((set, get) => {
       } finally {
         if (activeRun === run) activeRun = null
       }
-    })()
+    }
+    const lockName = `ismailnow-sync:${get().ownerId ?? 'none'}`
+    run.promise = navigator.locks
+      ? navigator.locks.request(lockName, drain).then(() => undefined)
+      : drain()
     activeRun = run
     return run.promise
   }
@@ -183,7 +230,12 @@ export const useTasksStore = create<TasksStore>((set, get) => {
     set((state) => {
       if (!state.ownerId) return state
       const tasks = transform(state.tasks)
-      return { tasks, error: persist(state.ownerId, tasks) }
+      const persisted = persist(state.ownerId, tasks)
+      return {
+        tasks,
+        volatile: !persisted,
+        error: persisted ? null : 'Changes could not be saved in this browser.',
+      }
     })
   }
 
@@ -192,6 +244,7 @@ export const useTasksStore = create<TasksStore>((set, get) => {
     tasks: [],
     loading: false,
     error: null,
+    volatile: false,
 
     load: (ownerId) => {
       syncGeneration += 1
@@ -202,19 +255,39 @@ export const useTasksStore = create<TasksStore>((set, get) => {
           tasks: loadFromStorage(ownerId).map(normalizeTask),
           loading: false,
           error: null,
+          volatile: false,
         })
       } catch {
-        set({ ownerId, tasks: [], loading: false, error: 'Saved tasks could not be loaded.' })
+        set({
+          ownerId,
+          tasks: [],
+          loading: false,
+          volatile: false,
+          error: 'Saved tasks could not be loaded.',
+        })
       }
     },
 
     clearMemory: () => {
       syncGeneration += 1
       activeRun = null
-      set({ ownerId: null, tasks: [], loading: false, error: null })
+      set({ ownerId: null, tasks: [], loading: false, error: null, volatile: false })
     },
 
     hasPendingChanges: () => get().tasks.some((task) => !task.synced),
+
+    hasVolatileChanges: () => get().volatile,
+
+    retryPersistence: () => {
+      const state = get()
+      if (!state.ownerId) return true
+      const persisted = persist(state.ownerId, state.tasks)
+      set({
+        volatile: !persisted,
+        error: persisted ? null : 'Changes could not be saved in this browser.',
+      })
+      return persisted
+    },
 
     fetchForDate: async (_date, getToken) => {
       if (!getToken) return
@@ -275,7 +348,7 @@ export const useTasksStore = create<TasksStore>((set, get) => {
       const now = new Date().toISOString()
       updateLocal((tasks) => tasks.map((task) =>
         task.id === id
-          ? { ...task, isDeleted: true, updatedAt: now, synced: false }
+          ? { ...task, isDeleted: true, deletedAt: now, updatedAt: now, synced: false }
           : task,
       ))
       if (getToken && navigator.onLine) {
@@ -316,6 +389,28 @@ export const useTasksStore = create<TasksStore>((set, get) => {
             ? 'Cloud sync is blocked because the Drive file is damaged.'
             : 'Cloud sync failed.',
         })
+        throw error
+      }
+    },
+
+    restoreBackup: async (getToken, backupId) => {
+      set({ loading: true, error: null })
+      try {
+        const restored = await restoreDriveBackup(getToken, backupId)
+        const tasks = restored.tasks.map((task) => ({ ...task, synced: true }))
+        const habits = restored.habits.map((habit) => ({ ...habit, synced: true }))
+        const ownerId = get().ownerId
+        if (!ownerId) throw new Error('No active account.')
+        const persisted = persist(ownerId, tasks)
+        set({
+          tasks,
+          loading: false,
+          volatile: !persisted,
+          error: persisted ? null : 'Restored tasks could not be saved in this browser.',
+        })
+        useHabitsStore.getState().applySyncResult(habits)
+      } catch (error) {
+        set({ loading: false, error: 'Backup restore failed.' })
         throw error
       }
     },

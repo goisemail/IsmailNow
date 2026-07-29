@@ -130,11 +130,11 @@ web/
 ### Offline Capabilities
 - Service worker automatically caches app shell
 - LocalStorage keeps habits and tasks available offline
-- Task changes sync automatically for Google users; habits remain local-only
+- Task and habit changes sync automatically for Google users
 
 ### Google Drive Sync Safety
 
-Local sync operations are serialized and Drive file versions are checked before writes. The app also verifies content after each upload and retries bounded conflicts. Google Drive does not always expose a browser-usable conditional-write ETag, so this direct single-file integration cannot guarantee atomic simultaneous writes from multiple devices. A transactional backend is required before advertising strict multi-device consistency.
+Local sync operations are serialized and Drive file versions are checked before writes. The versioned document includes tasks and habits, and recovery snapshots are retained before changed writes. The app verifies content after each upload and retries bounded conflicts. Google Drive does not always expose a browser-usable conditional-write ETag, so this direct single-file integration cannot guarantee atomic simultaneous writes from multiple devices. A transactional backend is required before advertising strict multi-device consistency.
 
 ## 🔧 Development Commands
 
@@ -191,7 +191,7 @@ npm run build
 
 - [ ] SQLite for advanced queries (Phase 2)
 - [ ] Local notifications/reminders
-- [ ] Historical Google Drive backup snapshots and restore
+- [x] Google Drive recovery snapshots and restore
 - [ ] i18n/localization
 - [ ] Advanced analytics dashboard
 - [ ] Dark mode toggle

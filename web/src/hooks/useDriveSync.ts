@@ -21,13 +21,13 @@ const FLUSH_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
  */
 export function useDriveSync(): void {
   const flushToDrive = useTasksStore((state) => state.flushToDrive)
-  const { canSync, getAccessToken } = useAuth()
+  const { canSync, getAccessToken, reauthRequired } = useAuth()
   const isOnline = useOnlineStatus()
 
   // ── Periodic flush + event listeners ────────────────────────────────────────
   useEffect(() => {
     const flush = () => {
-      if (canSync && navigator.onLine) {
+      if (canSync && !reauthRequired && navigator.onLine) {
         flushToDrive(getAccessToken).catch(console.error)
       }
     }
@@ -45,12 +45,12 @@ export function useDriveSync(): void {
       clearInterval(intervalId)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [canSync, flushToDrive, getAccessToken])
+  }, [canSync, flushToDrive, getAccessToken, reauthRequired])
 
   // ── Flush immediately when network comes back online ─────────────────────────
   useEffect(() => {
-    if (isOnline && canSync) {
+    if (isOnline && canSync && !reauthRequired) {
       flushToDrive(getAccessToken).catch(console.error)
     }
-  }, [canSync, getAccessToken, isOnline, flushToDrive])
+  }, [canSync, getAccessToken, isOnline, flushToDrive, reauthRequired])
 }

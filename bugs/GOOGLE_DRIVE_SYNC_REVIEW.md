@@ -3,29 +3,33 @@
 ## Review Status
 
 - Scope: `web/` Google Drive authentication, task synchronization, local persistence, and logout behavior
-- Review date: 2026-07-27
+- Initial review date: 2026-07-27
+- Follow-up review date: 2026-07-29
+- Follow-up implementation: commit `9aeae81` on `fix/drive-sync-release-blockers`
 - Reviewed implementation: `web/src/lib/googleDrive.ts`, `web/src/contexts/AuthContext.tsx`, `web/src/hooks/useDriveSync.ts`, task and habit stores, and sync UI entry points
 - React Native status: the `app/` Drive backup flow is not implemented; `app/src/screens/Screens.tsx:722-727` is a placeholder
 - Firebase status: Firebase is not used by the IsmailNow web Drive flow
-- Overall assessment: the direct Drive integration is functional in design, but data-loss, token-lifecycle, file-creation, and coverage gaps should be resolved before treating it as a reliable backup system
+- Overall assessment: the branch now synchronizes a validated, versioned task-and-habit document, protects volatile local state during account transitions, provides actionable OAuth recovery, resolves canonical duplicates, and creates restorable recovery snapshots. Cross-device writes remain best-effort because browser Drive v3 does not guarantee usable CAS, and tombstone purging remains intentionally disabled until device acknowledgements can prevent resurrection.
 
 ## Current Architecture
 
 ```text
 Google Identity Services
         |
-        | OAuth access token with drive.file scope
+        | OAuth access token held in memory with drive.file scope
         v
 Browser application
         |
-        +-- localStorage: local task and habit state
+        +-- localStorage: account-scoped task and habit state
+        |                and non-sensitive profile data
         |
         +-- Google Drive REST API v3
                 |
-                +-- ismailnow_data.json (tasks only)
+                +-- ismailnow_data.json (versioned tasks + habits)
+                +-- immutable recovery snapshot copies
 ```
 
-The web application requests these scopes in `web/src/contexts/AuthContext.tsx:33-38`:
+The web application requests these scopes in `web/src/contexts/AuthContext.tsx:51-56`:
 
 ```text
 openid
@@ -36,7 +40,7 @@ https://www.googleapis.com/auth/drive.file
 
 The `drive.file` scope is appropriately narrower than full Drive access. It permits the app to manage files it creates or files the user explicitly opens with the app.
 
-The Drive sync file is `ismailnow_data.json`, declared in `web/src/lib/googleDrive.ts:15`. The app:
+The Drive sync file is `ismailnow_data.json`, declared in `web/src/lib/googleDrive.ts:3`. The app:
 
 1. Searches for matching files with Drive `files.list`.
 2. Creates an empty JSON file if none exists.
@@ -52,7 +56,308 @@ Sync can run:
 - When network connectivity returns.
 - Immediately after a task is deleted.
 
-## Priority Summary
+## Follow-Up Assessment
+
+This section supersedes the status and evidence in the original 2026-07-27 findings below. The original findings are retained for history and design context.
+
+### Current Status By Finding
+
+| ID | Current Status | Follow-Up Assessment |
+|---|---|---|
+| GD-001 | Resolved in code | Account namespaces, volatile-memory guards, flush-aware logout, and explicit guest merge/keep/export/discard choices are implemented. |
+| GD-002 | Resolved in code | Tokens are memory-only and expiry-aware; terminal `401` enters actionable same-account reauthorization state and pauses automatic sync. |
+| GD-003 | Resolved | Bearer tokens are no longer persisted; CSP and related security headers are configured. |
+| GD-004 | Resolved in code | File creation now uses metadata creation followed by media upload. A live clean-account integration test is still required. |
+| GD-005 | Mitigated | Invalid and unsupported content blocks automatic writes. Raw corrupt-content preservation and restore UI are not implemented. |
+| GD-006 | Resolved in code | A versioned schema synchronizes tasks and timestamped habit records with legacy task-array migration. |
+| GD-007 | Partial | One runtime serializes sync and retries detected conflicts. Strict cross-device conditional writes are not guaranteed without a usable ETag/CAS mechanism. |
+| GD-008 | Resolved in code | Discovery uses canonical properties with pagination; validated duplicates are merged once and archived non-destructively. |
+| GD-009 | Resolved | The unused persistent file-ID cache was removed; the remaining cache is in-memory and reset on account transitions. |
+| GD-010 | Resolved in code | Changed writes and restores create immutable Drive recovery copies; Settings can list and restore them with retention. |
+| GD-011 | Partial by design | Tasks and habits now carry `deletedAt`; unsafe purging remains disabled until device acknowledgement/compaction epochs exist. |
+| GD-012 | Partial | The suite now covers 33 auth, Drive, persistence, hook, migration, and coordinator cases. Live Drive CAS and broader two-client tests remain. |
+| GD-013 | Resolved in code | Both stores track volatile state, retry persistence, and block destructive transitions unless data is exported or explicitly discarded. |
+| GD-014 | Resolved | User-info HTTP status and required profile fields are validated before account activation. |
+
+### Remaining Priority Summary
+
+| Priority | Related IDs | Remaining Work | Primary Risk |
+|---|---|---|---|
+| Medium | GD-007 | Verify or replace browser conditional-write behavior | Residual cross-device overwrite race |
+| Medium | GD-011 | Add device acknowledgements and compaction epochs before enabling tombstone purge | Unbounded tombstone growth without resurrection risk |
+| Medium test risk | GD-012 | Add live Drive ETag/CORS and broader two-client convergence coverage | Platform-specific conflict behavior remains unproven |
+
+### FR-001: Habits Are Still Not Synchronized
+
+**Development status:** Implemented. The section below records the requirement that drove the versioned task-and-habit schema.
+
+**Severity:** High
+
+**Related finding:** GD-006
+
+**Pre-development evidence**
+
+- `web/src/lib/googleDrive.ts:1-17` imports and exposes only task records and task snapshots.
+- `web/src/hooks/useDriveSync.ts:22-55` flushes only the task store.
+- `web/src/store/habits.ts:27-98` persists habits only to account-scoped `localStorage`.
+- The habit model has no `createdAt`, `updatedAt`, sync state, or deletion tombstone needed for deterministic merging.
+- Product documentation now states that task changes sync and habits remain local-only, but the capability gap remains.
+
+**Impact**
+
+A fresh browser or device can restore tasks from Drive but cannot restore habits, progress, or streaks. Clearing browser data can permanently remove habits unless the user has a manual export.
+
+**Required change**
+
+1. Introduce a versioned Drive document envelope containing tasks and habits.
+2. Migrate existing raw task arrays and wrapped legacy task shapes safely.
+3. Add habit mutation and deletion metadata.
+4. Define conflict behavior for habit definitions, completion state, and deletions.
+5. Reject unsupported future schema versions without writing.
+
+**Required tests**
+
+- Restore tasks and habits on a clean device.
+- Migrate a legacy task array without losing tasks.
+- Converge habit creation, editing, completion, and deletion across devices.
+- Verify an unsupported schema remains read-only.
+
+### FR-002: Terminal OAuth Failure Is Not Actionable
+
+**Development status:** Implemented with typed terminal authorization failure, same-account reconnect UI, and automatic-sync blocking.
+
+**Severity:** High
+
+**Related finding:** GD-002
+
+**Pre-development evidence**
+
+- `web/src/lib/googleDrive.ts:41-54` refreshes once after a Drive `401` and retries once.
+- If the retried request also returns `401`, `requireOk` converts it to a generic Drive error.
+- `web/src/contexts/AuthContext.tsx:185-214` sets `reauthRequired` when token acquisition or account validation fails, but the Drive repository cannot mark a terminal API `401` as requiring reauthorization.
+- `web/src/App.tsx:102-105` renders only a text banner and no dedicated reconnect action.
+- Background sync continues attempting flushes while authorization requires user action.
+
+**Impact**
+
+The UI can remain signed in while Drive synchronization repeatedly fails. Local data remains available, but the user has no clear `Reconnect Google Drive` action.
+
+**Required change**
+
+1. Add a typed `DriveAuthorizationError` for a second `401`.
+2. Invalidate the rejected token and propagate reauthorization state through the auth boundary.
+3. Add a `reauthorize()` action that retains the current profile and local namespace, validates the returned Google UID, and triggers one coordinated follow-up sync.
+4. Pause automatic sync while reauthorization is required.
+5. Ensure generic task errors do not hide the authorization recovery action.
+
+**Required tests**
+
+- Two consecutive `401` responses produce exactly two HTTP attempts and no loop.
+- Terminal `401` sets `reauthRequired` and leaves pending local data intact.
+- Reconnection with the same UID clears the blocked state and starts one sync.
+- Reconnection with another UID is rejected without switching local data.
+
+### FR-003: Guest-To-Google Migration Choices Are Missing
+
+**Development status:** Implemented with merge, keep separate, export, and post-switch discard choices.
+
+**Severity:** Medium
+
+**Related finding:** GD-001
+
+**Pre-development evidence**
+
+- `web/src/lib/accountStorage.ts:8-14` separates `guest:local` from Google account namespaces.
+- `web/src/contexts/AuthContext.tsx:235-256` activates the selected Google account after profile validation.
+- No flow offers merge, keep separate, export, or discard choices.
+
+Guest records are normally retained under `guest:local`, not deleted, but become inactive and therefore appear to disappear after sign-in. Keeping guest data separate matches the implementation decision made for the release-blocker branch, but it does not satisfy the original GD-001 migration acceptance criterion.
+
+**Required change**
+
+1. Detect persisted and volatile guest tasks and habits before activating Google storage.
+2. Offer `Merge`, `Keep separate`, `Export`, and explicit `Discard` choices.
+3. Copy data transactionally and keep the guest source until target persistence succeeds.
+4. Mark imported tasks pending so Drive merging occurs normally.
+5. Make migration idempotent and handle ID collisions.
+
+**Required tests**
+
+- Merge guest tasks and habits into empty and populated Google namespaces.
+- Keep-separate leaves the guest namespace unchanged and recoverable.
+- Failed target persistence leaves guest state active.
+- Repeating migration does not duplicate records.
+
+### FR-004: Persistence Failure Can Still Lose In-Memory Data
+
+**Development status:** Implemented with volatile-state tracking, persistence retry, export, and guarded transitions.
+
+**Severity:** High
+
+**Related findings:** GD-001, GD-013
+
+**Pre-development evidence**
+
+- `web/src/store/tasks.ts:113-120` and `182-187` report persistence failure but still commit the task mutation to memory.
+- `web/src/store/habits.ts:27-40` follows the same volatile-memory behavior.
+- `web/src/contexts/AuthContext.tsx:277-305` checks only pending Google tasks while online, then clears both stores during logout.
+- Offline logout, guest logout, and account switching do not guard volatile task or habit state.
+
+**Impact**
+
+If `localStorage.setItem` fails, the UI can contain the only remaining copy. Logout, guest-to-Google transition, account switching, reload, or a tab crash can permanently lose that data.
+
+**Required change**
+
+1. Track local durability separately from cloud synchronization in both stores.
+2. Expose `hasVolatileChanges` and a retry-persistence operation.
+3. Guard logout and every account transition when either store is volatile.
+4. Offer retry, export current memory, or explicit irreversible discard.
+5. Claim that data remains on the device only after a verified local write.
+
+**Required tests**
+
+- Force task and habit `localStorage.setItem` calls to throw and verify volatile state.
+- Offline logout with volatile data preserves the session and memory.
+- Guest-to-Google transition cannot replace volatile guest state.
+- Successful persistence retry clears the volatile flag and permits logout.
+
+### FR-005: Duplicate Drive Files Remain Recurring Inputs
+
+**Development status:** Implemented with paginated canonical discovery and non-destructive duplicate archival after verified merge.
+
+**Severity:** Medium
+
+**Related finding:** GD-008
+
+**Pre-development evidence**
+
+- `web/src/lib/googleDrive.ts:63-70` discovers files by filename and MIME type rather than canonical `appProperties`.
+- New files are tagged with `app=ismailnow` and `purpose=primary-sync`, but discovery does not use those tags.
+- `web/src/lib/googleDrive.ts:275-301` downloads and merges all matches, then chooses the first file for writes.
+- Discovery does not paginate `files.list` results.
+
+**Impact**
+
+Stale duplicates can contribute records repeatedly, clock-skewed records can override canonical data, and one corrupt duplicate can block an otherwise healthy canonical file.
+
+**Required change**
+
+1. Paginate Drive discovery.
+2. Query normal operation by canonical `appProperties`.
+3. Perform a one-time validated migration of legacy filename matches.
+4. Select one deterministic canonical file and archive or retag other files with a recovery window.
+5. Handle concurrent creation of multiple tagged primaries deterministically.
+
+**Required tests**
+
+- Migrate two legacy matches into one canonical source.
+- Ignore archived and unrelated same-name files during later syncs.
+- Block migration safely when one candidate is corrupt.
+- Resolve two tagged primary files without destructive deletion.
+
+### FR-006: Cross-Device Writes Are Still Best-Effort
+
+**Development status:** Partially implemented by design. Same-runtime serialization, same-browser Web Locks, version/ETag checks, backoff, and read-back verification are present. Strict multi-device CAS still requires platform proof or a backend.
+
+**Severity:** Medium
+
+**Related finding:** GD-007
+
+**Current evidence**
+
+- `web/src/store/tasks.ts:104-180` serializes one application runtime and queues a follow-up sync.
+- `web/src/lib/googleDrive.ts:304-345` compares Drive versions, sends `If-Match` only when an ETag is visible, and verifies uploaded content afterward.
+- The coordinator does not serialize separate tabs, browsers, or devices.
+- Drive v3 does not document an expected-version parameter for media updates, and browser ETag/CORS behavior is not proven by mocked tests.
+
+**Impact**
+
+Without an enforceable conditional header, another writer can update between version validation and upload. Read-back verification detects some but not all write orderings.
+
+**Required change**
+
+For best-effort direct Drive sync:
+
+1. Skip uploads when merged cloud content is unchanged.
+2. Use an account-scoped Web Lock for same-browser tabs where supported.
+3. Add randomized bounded retry backoff.
+4. Run a real-browser Drive integration probe for ETag visibility, CORS, and stale `If-Match` behavior.
+
+For guaranteed consistency, use a transactional backend with CAS or redesign synchronization around immutable operations. Do not advertise strict multi-device consistency until one of those designs is implemented.
+
+**Required tests**
+
+- HTTP `412` reloads, remerges, and retries within the configured limit.
+- Missing ETag follows the documented best-effort policy.
+- Read-back mismatch retries from a fresh remote snapshot.
+- Two simulated clients converge for different IDs, identical IDs, and tombstone conflicts.
+
+### FR-007: Recovery History And Tombstone Compaction Are Absent
+
+**Development status:** Recovery snapshots, retention, restore UI, and `deletedAt` metadata are implemented. Tombstone purge remains disabled because safe compaction requires device acknowledgements or a compaction epoch.
+
+**Severity:** Medium
+
+**Related findings:** GD-010, GD-011
+
+**Pre-development evidence**
+
+- `web/src/lib/googleDrive.ts:318-349` overwrites one synchronization file.
+- Settings provides a one-way local JSON export but no import or restore flow.
+- Tasks use `isDeleted` without `deletedAt`, acknowledgement, retention, or compaction metadata.
+- Every task tombstone remains in local and remote documents indefinitely.
+
+**Impact**
+
+The application cannot restore a previous valid state after a bad but syntactically valid merge, and the synchronization file grows indefinitely. Naive tombstone deletion would allow stale offline devices to resurrect records.
+
+**Required change**
+
+1. Keep the current document explicitly labeled as synchronization state.
+2. Add immutable snapshots before destructive migration, restore, and compaction.
+3. Add schema metadata, creation time, source revision, and checksum to snapshots.
+4. Add `deletedAt`, deletion generations, and a supported offline-device policy.
+5. Compact only after a verified write and recovery snapshot.
+
+**Required tests**
+
+- Restore creates a safety snapshot first.
+- Snapshot checksum failure blocks restoration.
+- Retention removes only eligible snapshots.
+- Recent and unacknowledged tombstones survive compaction.
+- A stale device cannot resurrect a compacted deletion.
+
+### FR-008: Automated Coverage Is Incomplete
+
+**Development status:** Expanded to 33 tests across auth, Drive, persistence, habits, task coordination, and `useDriveSync`. Live Drive and broader simulated convergence coverage remain.
+
+**Severity:** High test and release risk
+
+**Related finding:** GD-012
+
+The current suite contains auth, Drive repository, and task coordinator coverage. Existing tests cover token scrubbing, profile validation, first-`401` recovery, corrupt-data blocking, first-file creation, pre-write version mismatch, synthetic ETag usage, account retention, and in-process serialization.
+
+The following important cases remain untested:
+
+- Token reuse before expiry and refresh at the expiry-skew boundary.
+- Two consecutive `401` responses and actionable reauthorization.
+- Successful online logout flush, failed flush with cancel, and failed flush with confirmed logout.
+- Task and habit persistence failures and volatile transition guards.
+- Guest migration choices and idempotency.
+- `useDriveSync` interval, visibility, online, authorization, and cleanup behavior.
+- Canonical duplicate discovery, pagination, migration, and archival.
+- Store-level `412`, read-back mismatch, conflict retry, and retry exhaustion.
+- Realistic two-client convergence and a live-browser Drive ETag/CORS probe.
+
+### Remaining Implementation Order
+
+1. Run a live-browser Drive integration probe for ETag exposure, CORS, and stale `If-Match` behavior.
+2. Decide whether guaranteed multi-device consistency requires a transactional backend or immutable operation design.
+3. Add device acknowledgements and compaction epochs before enabling tombstone purge.
+4. Expand two-client convergence and snapshot-retention integration coverage.
+
+## Original Priority Summary (2026-07-27)
 
 | ID | Severity | Issue | Primary Risk |
 |---|---|---|---|
@@ -71,7 +376,7 @@ Sync can run:
 | GD-013 | Medium | Local persistence failures are silently ignored | Local changes can disappear without warning |
 | GD-014 | Medium | Google profile requests are not validated | Invalid sessions and unclear failures |
 
-## Detailed Findings
+## Original Detailed Findings (2026-07-27)
 
 ### GD-001: Sign-In And Logout Can Erase Unsynced Data
 

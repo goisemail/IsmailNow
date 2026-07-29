@@ -35,7 +35,12 @@ describe('task synchronization coordinator', () => {
     })
     drive.loads
       .mockReturnValueOnce(firstLoad)
-      .mockResolvedValue({ tasks: [], file: { id: 'file', version: '2' } })
+      .mockResolvedValue({
+        tasks: [],
+        habits: [],
+        duplicateFileIds: [],
+        file: { id: 'file', version: '2' },
+      })
 
     await useTasksStore.getState().addTask('First', '2026-07-28')
     const firstSync = useTasksStore.getState().flushToDrive(async () => 'token')
@@ -43,7 +48,12 @@ describe('task synchronization coordinator', () => {
 
     expect(drive.loads).toHaveBeenCalledTimes(1)
     await useTasksStore.getState().addTask('Added during sync', '2026-07-28')
-    releaseFirst?.({ tasks: [], file: { id: 'file', version: '1' } })
+    releaseFirst?.({
+      tasks: [],
+      habits: [],
+      duplicateFileIds: [],
+      file: { id: 'file', version: '1' },
+    })
 
     await Promise.all([firstSync, overlappingSync])
 
@@ -82,5 +92,17 @@ describe('task synchronization coordinator', () => {
     }
 
     expect(mergeTasks([uncompleted], [completed])[0].completedDate).toBeUndefined()
+  })
+
+  it('marks an in-memory mutation volatile when local persistence fails', async () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Quota exceeded', 'QuotaExceededError')
+    })
+
+    await useTasksStore.getState().addTask('Volatile', '2026-07-28')
+
+    expect(useTasksStore.getState().tasks).toHaveLength(1)
+    expect(useTasksStore.getState().hasVolatileChanges()).toBe(true)
+    expect(useTasksStore.getState().retryPersistence()).toBe(false)
   })
 })

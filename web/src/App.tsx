@@ -42,6 +42,7 @@ function AppContent() {
     canSync,
     signIn,
     signOut,
+    reauthorize,
     getAccessToken,
   } = useAuth()
   const isOnline = useOnlineStatus()
@@ -91,17 +92,31 @@ function AppContent() {
     navigate('/login')
   }
 
+  const handleReconnect = async () => {
+    if (await reauthorize()) {
+      await syncWithDrive(getAccessToken).catch(() => undefined)
+    }
+  }
+
   return (
     <div className="app-wrapper">
       {/* Offline banner */}
       {!isOnline && (
         <div className="offline-banner" role="status">
-          📵 Offline — task changes will sync when reconnected
+          📵 Offline — changes will sync when reconnected
         </div>
       )}
-      {(authError || taskError || habitError || reauthRequired) && (
+      {reauthRequired && (
         <div className="offline-banner" role="alert">
-          {authError ?? taskError ?? habitError ?? 'Cloud sync needs Google authorization.'}
+          Google Drive authorization expired.
+          <button type="button" className="btn btn-sm btn-light ms-2" onClick={handleReconnect}>
+            Reconnect Google Drive
+          </button>
+        </div>
+      )}
+      {!reauthRequired && (authError || taskError || habitError) && (
+        <div className="offline-banner" role="alert">
+          {authError ?? taskError ?? habitError}
         </div>
       )}
 

@@ -5,7 +5,7 @@ import { Plus, Edit2, Trash2 } from 'lucide-react'
 import './Habits.css'
 
 export default function Habits() {
-  const habits = useHabitsStore((state) => state.habits)
+  const habits = useHabitsStore((state) => state.habits.filter((habit) => !habit.isDeleted))
   const addHabit = useHabitsStore((state) => state.addHabit)
   const deleteHabit = useHabitsStore((state) => state.deleteHabit)
   const logCompletion = useHabitsStore((state) => state.logCompletion)
