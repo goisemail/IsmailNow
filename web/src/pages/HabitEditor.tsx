@@ -7,11 +7,11 @@ import { habitColors } from '../theme/colors'
 export default function HabitEditor() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const habits = useHabitsStore((state) => state.habits.filter((habit) => !habit.isDeleted))
+  const habits = useHabitsStore((state) => state.habits)
   const addHabit = useHabitsStore((state) => state.addHabit)
   const updateHabit = useHabitsStore((state) => state.updateHabit)
 
-  const habit = id ? habits.find((h) => h.id === id) : null
+  const habit = id ? habits.find((h) => h.id === id && !h.isDeleted) : null
   const [name, setName] = useState(habit?.name || '')
   const [color, setColor] = useState(habit?.color || Object.values(habitColors)[0])
 

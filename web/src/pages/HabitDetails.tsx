@@ -5,10 +5,10 @@ import { ArrowLeft } from 'lucide-react'
 export default function HabitDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const habits = useHabitsStore((state) => state.habits.filter((habit) => !habit.isDeleted))
+  const habits = useHabitsStore((state) => state.habits)
   const logCompletion = useHabitsStore((state) => state.logCompletion)
 
-  const habit = habits.find((h) => h.id === id)
+  const habit = habits.find((h) => h.id === id && !h.isDeleted)
 
   if (!habit) {
     return (
