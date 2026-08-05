@@ -3,7 +3,7 @@ import { useTasksStore, PendingTask } from '../store/tasks'
 import { useAuth } from '../contexts/AuthContext'
 import { Pencil, Trash2 } from 'lucide-react'
 import { formatDate } from '../utils/date'
-import { getReadableTextColor } from '../utils/color'
+import { getContrastingAccentColor } from '../utils/color'
 import TaskWizard from '../components/TaskWizard'
 import './Tasks.css'
 
@@ -167,17 +167,15 @@ interface TaskRowProps {
 
 function TaskRow({ task, onToggle, onEdit, onDelete, canEdit = true }: TaskRowProps) {
   const isDone = !!task.completedDate
-  const titleColor = getReadableTextColor(task.backgroundColor)
 
   return (
     <div
       className="task-row"
-      style={{ backgroundColor: task.backgroundColor ?? '#f8f9fa' }}
       data-testid={`task-row-${task.id}`}
     >
+      <span className="task-color-bar" style={{ backgroundColor: getContrastingAccentColor(task.backgroundColor) }} aria-hidden="true" />
       <span
         className={'task-title' + (isDone ? ' completed' : '')}
-        style={{ color: isDone ? '#6c757d' : titleColor }}
       >
         {task.title}
         {!task.synced && (

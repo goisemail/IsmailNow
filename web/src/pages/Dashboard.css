@@ -158,10 +158,14 @@
 }
 
 .task-row {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 12px 16px 12px 18px;
+  overflow: hidden;
+  color: #212529;
+  background: #ffffff;
   border-bottom: 1px solid #dee2e6;
   gap: 12px;
 }
@@ -211,6 +215,27 @@
 
 .task-toggle.done:hover {
   background: #157347;
+}
+
+@media (prefers-color-scheme: dark) {
+  .task-list {
+    background: #2b3035;
+    border-color: #495057;
+  }
+
+  .task-row {
+    color: #f8f9fa;
+    background: #2b3035;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .task-title {
+    color: #f8f9fa;
+  }
+
+  .task-title.completed {
+    color: #adb5bd;
+  }
 }
 
 /* Offline pending indicator on task title */

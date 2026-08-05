@@ -396,7 +396,8 @@ body {
   border-bottom: 0;
 }
 
-.habit-color-bar {
+.habit-color-bar,
+.task-color-bar {
   position: absolute;
   inset: 0 auto 0 0;
   width: 5px;

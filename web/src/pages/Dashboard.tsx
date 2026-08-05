@@ -14,7 +14,7 @@ import './Dashboard.css'
 import QuickAddSheet from '../components/QuickAddSheet'
 import HabitWizard from '../components/HabitWizard'
 import TaskWizard from '../components/TaskWizard'
-import { getReadableTextColor } from '../utils/color'
+import { getContrastingAccentColor } from '../utils/color'
 
 interface WeekDay {
   key: string
@@ -189,17 +189,15 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
           <div className="task-list">
             {tasksForDate.map((task) => {
               const isCompleted = task.completedDate === selectedDate
-              const titleColor = getReadableTextColor(task.backgroundColor)
               return (
                 <div
                   key={task.id}
                   className="task-row"
-                  style={{ backgroundColor: task.backgroundColor ?? '#f8f9fa' }}
                   data-testid={'task-' + task.id}
                 >
+                  <span className="task-color-bar" style={{ backgroundColor: getContrastingAccentColor(task.backgroundColor) }} aria-hidden="true" />
                   <span
                     className={'task-title' + (isCompleted ? ' completed' : '')}
-                    style={{ color: isCompleted ? '#6c757d' : titleColor }}
                   >
                     {task.title}
                     {!task.synced && (

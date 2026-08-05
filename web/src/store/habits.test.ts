@@ -120,6 +120,9 @@ describe('habit schedules and statistics', () => {
   })
 
   it('keeps an active streak while the current scheduled day is pending', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-29T12:00:00'))
     expect(getHabitStats(habit, [completed('2026-07-27')], '2026-07-29').currentStreak).toBe(1)
+    vi.useRealTimers()
   })
 })
