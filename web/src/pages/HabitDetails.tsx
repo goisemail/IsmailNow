@@ -1,12 +1,18 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { useHabitsStore } from '../store/habits'
-import { ArrowLeft } from 'lucide-react'
+import { getHabitEntry, getHabitStats, todayLocal, useHabitsStore } from '../store/habits'
+import { ArrowLeft, Edit2 } from 'lucide-react'
+import HabitWizard from '../components/HabitWizard'
+import './HabitDetails.css'
 
 export default function HabitDetails() {
   const { id } = useParams()
   const navigate = useNavigate()
   const habits = useHabitsStore((state) => state.habits)
+  const entries = useHabitsStore((state) => state.entries)
   const logCompletion = useHabitsStore((state) => state.logCompletion)
+  const updateHabit = useHabitsStore((state) => state.updateHabit)
+  const [editOpen, setEditOpen] = useState(false)
 
   const habit = habits.find((h) => h.id === id && !h.isDeleted)
 
@@ -24,59 +30,69 @@ export default function HabitDetails() {
     )
   }
 
+  const today = todayLocal()
+  const entry = getHabitEntry(entries, habit.id, today)
+  const stats = getHabitStats(habit, entries)
+  const target = habit.evaluation.type === 'binary' ? 1 : habit.evaluation.target
+  const count = entry?.value ?? 0
+  const segmentCount = Math.min(Math.max(Math.round(target), 1), 20)
+  const filledSegments = Math.round(Math.min(1, count / target) * segmentCount)
+  const lastLogged = entries
+    .filter((candidate) => candidate.habitId === habit.id && !candidate.isDeleted)
+    .sort((a, b) => b.date.localeCompare(a.date))[0]?.date
+
   return (
-    <div className="container py-4">
-      <button
-        className="btn btn-outline-secondary btn-sm mb-3"
-        onClick={() => navigate('/')}
-      >
-        <ArrowLeft size={16} /> Back
-      </button>
-
-      <div className="card p-4">
-        <h1 className="h3 mb-4">{habit.name}</h1>
-
-        <div className="row g-3 mb-4">
-          <div className="col-6">
-            <div className="text-muted small">Streak</div>
-            <div className="h4 mb-0">{habit.streak} 🔥</div>
-          </div>
-          <div className="col-6">
-            <div className="text-muted small">Progress</div>
-            <div className="h4 mb-0">{(habit.progress * 100).toFixed(0)}%</div>
+    <div className="habit-details container-lg py-4">
+      <div className="habit-details-toolbar">
+        <button className="habit-back-btn" onClick={() => navigate('/habits')} aria-label="Back to habits">
+          <ArrowLeft size={20} />
+        </button>
+        <div className="habit-details-title">
+          <span className="habit-details-color" style={{ backgroundColor: habit.color }} />
+          <div>
+            <h1>{habit.name}</h1>
+            <span>Statistics</span>
           </div>
         </div>
+        <button className="habit-edit-link" onClick={() => setEditOpen(true)}>
+          <Edit2 size={16} /> Edit
+        </button>
+      </div>
 
-        <div className="progress mb-4" style={{ height: '40px' }}>
-          <div
-            className="progress-bar"
-            role="progressbar"
-            style={{
-              width: `${habit.progress * 100}%`,
-              backgroundColor: habit.color,
-            }}
-            aria-valuenow={habit.progress * 100}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          ></div>
+      <section className="habit-stats-panel">
+        <div className="habit-stats-grid">
+          <div><span>Today</span><strong>{count}<small>/{target}</small></strong></div>
+          <div><span>Current streak</span><strong>{stats.currentStreak}<small> days</small></strong></div>
+          <div><span>Success rate</span><strong>{stats.successRate}<small>%</small></strong></div>
+          <div><span>Last logged</span><strong className="habit-stat-date">{lastLogged ?? 'Not yet'}</strong></div>
+        </div>
+
+        <div
+          className="habit-counter-visual"
+          style={{ gridTemplateColumns: `repeat(${segmentCount}, 1fr)` }}
+          aria-label={`${count} out of ${target} completed`}
+        >
+          {Array.from({ length: segmentCount }, (_, index) => (
+            <span key={index} className={index < filledSegments ? 'filled' : ''} style={{ '--habit-color': habit.color } as React.CSSProperties} />
+          ))}
         </div>
 
         <button
-          className="btn btn-lg w-100"
-          style={{
-            backgroundColor: habit.color,
-            color: 'white',
-            border: 'none',
-          }}
-          onClick={() => {
-            logCompletion(habit.id)
-            navigate('/')
-          }}
+          className="habit-stat-log-btn"
+          style={{ backgroundColor: habit.color }}
+          onClick={() => logCompletion(habit.id, today)}
           data-testid="logCompletionBtn"
         >
-          Log Completion
+          {entry?.state === 'completed' ? 'Completed ✓' : `Record progress (${count}/${target})`}
         </button>
-      </div>
+      </section>
+      <HabitWizard
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        onSave={(draft) => updateHabit(habit.id, draft)}
+        initialHabit={habit}
+        title="Edit Habit"
+      />
     </div>
   )
 }

@@ -1,8 +1,8 @@
-import type { Habit } from '../store/habits'
+import type { Habit, HabitEntry, HabitEvaluation, HabitSchedule } from '../store/habits'
 import type { PendingTask } from '../store/tasks'
 
 const DRIVE_FILE_NAME = 'ismailnow_data.json'
-const SCHEMA_VERSION = 2
+const SCHEMA_VERSION = 3
 
 export type TokenProvider = (forceRefresh?: boolean) => Promise<string>
 
@@ -25,17 +25,19 @@ export interface DriveBackup {
 export interface DriveTasksSnapshot {
   tasks: PendingTask[]
   habits: Habit[]
+  habitEntries: HabitEntry[]
   file: DriveFileMeta
   duplicateFileIds: string[]
   contentFingerprint: string
   requiresCanonicalMigration: boolean
 }
 
-interface SyncDocumentV2 {
-  schemaVersion: 2
+interface SyncDocumentV3 {
+  schemaVersion: 3
   updatedAt: string
   tasks: Omit<PendingTask, 'synced'>[]
   habits: Omit<Habit, 'synced'>[]
+  habitEntries: Omit<HabitEntry, 'synced'>[]
 }
 
 export class DriveDataError extends Error {
@@ -194,23 +196,90 @@ function parseHabits(candidates: unknown[]): Habit[] {
     const updatedAt = validTimestamp(raw.updatedAt) ?? createdAt
     const deletedAt = raw.deletedAt === undefined ? undefined : validTimestamp(raw.deletedAt)
     if (raw.deletedAt !== undefined && !deletedAt) throw new DriveDataError(`Habit ${index + 1} has invalid deletion metadata.`)
+    const evaluation = raw.evaluation && typeof raw.evaluation === 'object'
+      ? raw.evaluation as HabitEvaluation
+      : { type: 'counter' as const, criterion: 'atLeast' as const, target: 10 }
+    const schedule = raw.schedule && typeof raw.schedule === 'object'
+      ? raw.schedule as HabitSchedule
+      : { type: 'everyDay' as const }
     return {
       id: raw.id,
       name: raw.name,
       color: typeof raw.color === 'string' ? raw.color : '#E7F5FF',
-      progress: typeof raw.progress === 'number' ? raw.progress : 0,
-      streak: typeof raw.streak === 'number' ? raw.streak : 0,
+      ...(typeof raw.description === 'string' ? { description: raw.description } : {}),
+      category: typeof raw.category === 'string' ? raw.category : 'Other',
+      priority: typeof raw.priority === 'number' ? raw.priority : 0,
+      evaluation,
+      schedule,
+      startDate: validDate(raw.startDate) ?? createdAt.slice(0, 10),
+      ...(validDate(raw.endDate) ? { endDate: validDate(raw.endDate) } : {}),
+      ...(validTimestamp(raw.archivedAt) ? { archivedAt: validTimestamp(raw.archivedAt) } : {}),
       createdAt,
       updatedAt,
       synced: true,
-      ...(validDate(raw.lastCompletedDate) ? { lastCompletedDate: validDate(raw.lastCompletedDate) } : {}),
       ...(raw.isDeleted === true ? { isDeleted: true } : {}),
       ...(deletedAt ? { deletedAt } : {}),
     }
   })
 }
 
-export function parseSyncDocument(text: string): { tasks: PendingTask[]; habits: Habit[] } {
+function parseHabitEntries(candidates: unknown[]): HabitEntry[] {
+  const ids = new Set<string>()
+  return candidates.map((item, index) => {
+    if (!item || typeof item !== 'object') throw new DriveDataError(`Habit entry ${index + 1} is not an object.`)
+    const raw = item as Record<string, unknown>
+    if (typeof raw.id !== 'string' || typeof raw.habitId !== 'string') {
+      throw new DriveDataError(`Habit entry ${index + 1} has no ID.`)
+    }
+    if (ids.has(raw.id)) throw new DriveDataError(`Duplicate habit entry ID ${raw.id}.`)
+    ids.add(raw.id)
+    const date = validDate(raw.date)
+    const createdAt = validTimestamp(raw.createdAt)
+    const updatedAt = validTimestamp(raw.updatedAt)
+    const states = ['completed', 'failed', 'inProgress', 'skipped']
+    if (!date || !createdAt || !updatedAt || typeof raw.state !== 'string' || !states.includes(raw.state)) {
+      throw new DriveDataError(`Habit entry ${index + 1} is invalid.`)
+    }
+    return {
+      id: raw.id,
+      habitId: raw.habitId,
+      date,
+      state: raw.state as HabitEntry['state'],
+      ...(typeof raw.value === 'number' ? { value: raw.value } : {}),
+      ...(typeof raw.targetSnapshot === 'number' ? { targetSnapshot: raw.targetSnapshot } : {}),
+      ...(typeof raw.note === 'string' ? { note: raw.note } : {}),
+      createdAt,
+      updatedAt,
+      synced: true,
+      ...(raw.isDeleted === true ? { isDeleted: true } : {}),
+      ...(validTimestamp(raw.deletedAt) ? { deletedAt: validTimestamp(raw.deletedAt) } : {}),
+    }
+  })
+}
+
+function migrateLegacyHabitEntries(candidates: unknown[], habits: Habit[]): HabitEntry[] {
+  return candidates.flatMap((item, index) => {
+    if (!item || typeof item !== 'object') return []
+    const raw = item as Record<string, unknown>
+    const progress = typeof raw.progress === 'number' ? raw.progress : 0
+    const date = validDate(raw.lastCompletedDate)
+    if (!date || progress <= 0) return []
+    const value = Math.max(1, Math.round(progress * 10))
+    return [{
+      id: `${habits[index].id}:${date}`,
+      habitId: habits[index].id,
+      date,
+      state: value >= 10 ? 'completed' as const : 'inProgress' as const,
+      value,
+      targetSnapshot: 10,
+      createdAt: habits[index].updatedAt,
+      updatedAt: habits[index].updatedAt,
+      synced: true,
+    }]
+  })
+}
+
+export function parseSyncDocument(text: string): { tasks: PendingTask[]; habits: Habit[]; habitEntries: HabitEntry[] } {
   if (!text.trim()) throw new DriveDataError('The Drive sync file is empty or truncated.')
   let parsed: unknown
   try {
@@ -218,10 +287,10 @@ export function parseSyncDocument(text: string): { tasks: PendingTask[]; habits:
   } catch {
     throw new DriveDataError('The Drive sync file contains invalid JSON.')
   }
-  if (Array.isArray(parsed)) return { tasks: parseTasks(parsed), habits: [] }
+  if (Array.isArray(parsed)) return { tasks: parseTasks(parsed), habits: [], habitEntries: [] }
   if (!parsed || typeof parsed !== 'object') throw new DriveDataError('The Drive sync file has an unsupported structure.')
-  const wrapped = parsed as { schemaVersion?: unknown; tasks?: unknown; habits?: unknown; data?: { tasks?: unknown; habits?: unknown } }
-  if (wrapped.schemaVersion !== undefined && wrapped.schemaVersion !== SCHEMA_VERSION) {
+  const wrapped = parsed as { schemaVersion?: unknown; tasks?: unknown; habits?: unknown; habitEntries?: unknown; data?: { tasks?: unknown; habits?: unknown } }
+  if (wrapped.schemaVersion !== undefined && wrapped.schemaVersion !== 2 && wrapped.schemaVersion !== SCHEMA_VERSION) {
     throw new DriveDataError('The Drive sync file uses an unsupported schema version.')
   }
   const taskCandidates = Array.isArray(wrapped.tasks)
@@ -231,7 +300,11 @@ export function parseSyncDocument(text: string): { tasks: PendingTask[]; habits:
   const habitCandidates = Array.isArray(wrapped.habits)
     ? wrapped.habits
     : (Array.isArray(wrapped.data?.habits) ? wrapped.data.habits : [])
-  return { tasks: parseTasks(taskCandidates), habits: parseHabits(habitCandidates) }
+  const habits = parseHabits(habitCandidates)
+  const habitEntries = Array.isArray(wrapped.habitEntries)
+    ? parseHabitEntries(wrapped.habitEntries)
+    : migrateLegacyHabitEntries(habitCandidates, habits)
+  return { tasks: parseTasks(taskCandidates), habits, habitEntries }
 }
 
 export function parseTasksDocument(text: string): PendingTask[] {
@@ -246,16 +319,17 @@ function withoutSynced<T extends { synced: boolean }>(records: T[]): Omit<T, 'sy
   })
 }
 
-function createDocument(tasks: PendingTask[], habits: Habit[]): SyncDocumentV2 {
+function createDocument(tasks: PendingTask[], habits: Habit[], habitEntries: HabitEntry[]): SyncDocumentV3 {
   return {
     schemaVersion: SCHEMA_VERSION,
     updatedAt: new Date().toISOString(),
     tasks: withoutSynced(tasks),
     habits: withoutSynced(habits),
+    habitEntries: withoutSynced(habitEntries),
   }
 }
 
-function canonicalData(tasks: PendingTask[], habits: Habit[]): string {
+function canonicalData(tasks: PendingTask[], habits: Habit[], habitEntries: HabitEntry[]): string {
   return JSON.stringify({
     tasks: withoutSynced(tasks)
       .sort((left, right) => left.id.localeCompare(right.id))
@@ -276,14 +350,21 @@ function canonicalData(tasks: PendingTask[], habits: Habit[]): string {
         id: habit.id,
         name: habit.name,
         color: habit.color,
-        progress: habit.progress,
-        streak: habit.streak,
-        lastCompletedDate: habit.lastCompletedDate ?? null,
+        description: habit.description ?? null,
+        category: habit.category,
+        priority: habit.priority,
+        evaluation: habit.evaluation,
+        schedule: habit.schedule,
+        startDate: habit.startDate,
+        endDate: habit.endDate ?? null,
+        archivedAt: habit.archivedAt ?? null,
         createdAt: habit.createdAt,
         updatedAt: habit.updatedAt,
         isDeleted: habit.isDeleted === true,
         deletedAt: habit.deletedAt ?? null,
       })),
+    habitEntries: withoutSynced(habitEntries)
+      .sort((left, right) => left.id.localeCompare(right.id)),
   })
 }
 
@@ -292,7 +373,7 @@ async function initializeFile(getToken: TokenProvider, file: DriveFileMeta): Pro
   const upload = await requireOk(await driveFetch(getToken, uploadUrl, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(createDocument([], [])),
+    body: JSON.stringify(createDocument([], [], [])),
   }))
   const uploaded = (await upload.json()) as DriveFileMeta
   const metadataUrl = `https://www.googleapis.com/drive/v3/files/${file.id}?fields=id,version,size,appProperties`
@@ -338,7 +419,7 @@ export async function getOrCreateDriveFile(getToken: TokenProvider): Promise<Dri
   }
 }
 
-async function readFile(getToken: TokenProvider, fileId: string): Promise<{ tasks: PendingTask[]; habits: Habit[] }> {
+async function readFile(getToken: TokenProvider, fileId: string): Promise<{ tasks: PendingTask[]; habits: Habit[]; habitEntries: HabitEntry[] }> {
   const response = await requireOk(await driveFetch(getToken, `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`))
   return parseSyncDocument(await response.text())
 }
@@ -352,6 +433,7 @@ export async function loadTasksFromDrive(getToken: TokenProvider): Promise<Drive
   const snapshots = await Promise.all(files.map(async (file) => ({ file, data: await readFile(getToken, file.id) })))
   const tasks = new Map<string, PendingTask>()
   const habits = new Map<string, Habit>()
+  const habitEntries = new Map<string, HabitEntry>()
   for (const snapshot of snapshots) {
     for (const task of snapshot.data.tasks) {
       const current = tasks.get(task.id)
@@ -361,14 +443,23 @@ export async function loadTasksFromDrive(getToken: TokenProvider): Promise<Drive
       const current = habits.get(habit.id)
       if (!current || habit.updatedAt > current.updatedAt) habits.set(habit.id, habit)
     }
+    for (const entry of snapshot.data.habitEntries) {
+      const current = habitEntries.get(entry.id)
+      if (!current || entry.updatedAt > current.updatedAt) habitEntries.set(entry.id, entry)
+    }
   }
   cachedFile = snapshots[0].file
   return {
     file: snapshots[0].file,
     tasks: Array.from(tasks.values()),
     habits: Array.from(habits.values()),
+    habitEntries: Array.from(habitEntries.values()),
     duplicateFileIds: snapshots.slice(1).map((snapshot) => snapshot.file.id),
-    contentFingerprint: canonicalData(Array.from(tasks.values()), Array.from(habits.values())),
+    contentFingerprint: canonicalData(
+      Array.from(tasks.values()),
+      Array.from(habits.values()),
+      Array.from(habitEntries.values()),
+    ),
     requiresCanonicalMigration: snapshots[0].file.appProperties?.purpose !== 'primary-sync',
   }
 }
@@ -430,12 +521,13 @@ export async function saveTasksToDrive(
   tasks: PendingTask[],
   base: DriveFileMeta,
   habits: Habit[] = [],
+  habitEntries: HabitEntry[] = [],
   duplicateFileIds: string[] = [],
   baseFingerprint?: string,
   createBackup = true,
   requiresCanonicalMigration = false,
 ): Promise<DriveFileMeta> {
-  if (baseFingerprint === canonicalData(tasks, habits) && duplicateFileIds.length === 0) {
+  if (baseFingerprint === canonicalData(tasks, habits, habitEntries) && duplicateFileIds.length === 0) {
     return base
   }
   const current = await getCurrentFile(getToken, base.id)
@@ -447,7 +539,7 @@ export async function saveTasksToDrive(
   )) {
     await createRecoverySnapshot(getToken, base, duplicateFileIds.length ? 'duplicate-migration' : 'pre-sync')
   }
-  const document = createDocument(tasks, habits)
+  const document = createDocument(tasks, habits, habitEntries)
   const response = await requireOk(await driveFetch(getToken,
     `https://www.googleapis.com/upload/drive/v3/files/${base.id}?uploadType=media&fields=id,version,size,appProperties`, {
       method: 'PATCH',
@@ -456,7 +548,7 @@ export async function saveTasksToDrive(
     }))
   const updated = (await response.json()) as DriveFileMeta
   const verified = await readFile(getToken, base.id)
-  if (canonicalData(verified.tasks, verified.habits) !== canonicalData(tasks, habits)) {
+  if (canonicalData(verified.tasks, verified.habits, verified.habitEntries) !== canonicalData(tasks, habits, habitEntries)) {
     throw new DriveConflictError('The Drive write was replaced before it could be verified.')
   }
   await requireOk(await driveFetch(getToken,
@@ -473,7 +565,7 @@ export async function saveTasksToDrive(
 export async function restoreDriveBackup(
   getToken: TokenProvider,
   backupId: string,
-): Promise<{ tasks: PendingTask[]; habits: Habit[] }> {
+): Promise<{ tasks: PendingTask[]; habits: Habit[]; habitEntries: HabitEntry[] }> {
   const backup = await readFile(getToken, backupId)
   const current = await loadTasksFromDrive(getToken)
   await createRecoverySnapshot(getToken, current.file, 'pre-restore')
@@ -482,6 +574,7 @@ export async function restoreDriveBackup(
     backup.tasks.map((task) => ({ ...task, synced: true })),
     current.file,
     backup.habits.map((habit) => ({ ...habit, synced: true })),
+    backup.habitEntries.map((entry) => ({ ...entry, synced: true })),
     current.duplicateFileIds,
     undefined,
     false,

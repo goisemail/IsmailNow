@@ -8,7 +8,7 @@ import {
   saveTasksToDrive,
   type TokenProvider,
 } from '../lib/googleDrive'
-import { mergeHabits, useHabitsStore } from './habits'
+import { mergeHabitEntries, mergeHabits, useHabitsStore } from './habits'
 
 export interface PendingTask {
   id: string
@@ -133,10 +133,15 @@ export const useTasksStore = create<TasksStore>((set, get) => {
     for (let attempt = 0; attempt < MAX_CONFLICT_RETRIES; attempt += 1) {
       const localSnapshot = get().tasks.map(normalizeTask)
       const localHabits = useHabitsStore.getState().habits
+      const localHabitEntries = useHabitsStore.getState().entries
       const remote = await loadTasksFromDrive(getToken)
       const merged = mergeTasks(localSnapshot, remote.tasks).map((task) => ({ ...task, synced: true }))
       const mergedHabits = mergeHabits(localHabits, remote.habits ?? []).map((habit) => ({
         ...habit,
+        synced: true,
+      }))
+      const mergedHabitEntries = mergeHabitEntries(localHabitEntries, remote.habitEntries ?? []).map((entry) => ({
+        ...entry,
         synced: true,
       }))
 
@@ -146,6 +151,7 @@ export const useTasksStore = create<TasksStore>((set, get) => {
           merged,
           remote.file,
           mergedHabits,
+          mergedHabitEntries,
           remote.duplicateFileIds ?? [],
           remote.contentFingerprint,
           true,
@@ -166,6 +172,7 @@ export const useTasksStore = create<TasksStore>((set, get) => {
 
       const latest = get().tasks.map(normalizeTask)
       const latestHabits = useHabitsStore.getState().habits
+      const latestHabitEntries = useHabitsStore.getState().entries
       const uploadedById = new Map(merged.map((task) => [task.id, task]))
       const latestById = new Map(latest.map((task) => [task.id, task]))
       const reconciled = mergeTasks(latest, merged).map((task) => {
@@ -189,10 +196,18 @@ export const useTasksStore = create<TasksStore>((set, get) => {
         const changedDuringSync = Boolean(current && (!uploaded || current.updatedAt !== uploaded.updatedAt))
         return { ...habit, synced: !changedDuringSync }
       })
-      useHabitsStore.getState().applySyncResult(reconciledHabits)
+      const uploadedEntries = new Map(mergedHabitEntries.map((entry) => [entry.id, entry]))
+      const latestEntriesById = new Map(latestHabitEntries.map((entry) => [entry.id, entry]))
+      const reconciledEntries = mergeHabitEntries(latestHabitEntries, mergedHabitEntries).map((entry) => {
+        const uploaded = uploadedEntries.get(entry.id)
+        const current = latestEntriesById.get(entry.id)
+        return { ...entry, synced: !current || Boolean(uploaded && current.updatedAt === uploaded.updatedAt) }
+      })
+      useHabitsStore.getState().applySyncResult(reconciledHabits, reconciledEntries)
 
       return reconciled.some((task) => !task.synced) ||
-        reconciledHabits.some((habit) => !habit.synced)
+        reconciledHabits.some((habit) => !habit.synced) ||
+        reconciledEntries.some((entry) => !entry.synced)
     }
     return false
   }
@@ -399,6 +414,7 @@ export const useTasksStore = create<TasksStore>((set, get) => {
         const restored = await restoreDriveBackup(getToken, backupId)
         const tasks = restored.tasks.map((task) => ({ ...task, synced: true }))
         const habits = restored.habits.map((habit) => ({ ...habit, synced: true }))
+        const entries = restored.habitEntries.map((entry) => ({ ...entry, synced: true }))
         const ownerId = get().ownerId
         if (!ownerId) throw new Error('No active account.')
         const persisted = persist(ownerId, tasks)
@@ -408,7 +424,7 @@ export const useTasksStore = create<TasksStore>((set, get) => {
           volatile: !persisted,
           error: persisted ? null : 'Restored tasks could not be saved in this browser.',
         })
-        useHabitsStore.getState().applySyncResult(habits)
+        useHabitsStore.getState().applySyncResult(habits, entries)
       } catch (error) {
         set({ loading: false, error: 'Backup restore failed.' })
         throw error

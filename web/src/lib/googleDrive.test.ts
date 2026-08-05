@@ -66,6 +66,7 @@ describe('Drive document parsing', () => {
     }))
 
     expect(parsed.habits).toMatchObject([{ id: 'habit-1', name: 'Read', synced: true }])
+    expect(parsed.habitEntries).toEqual([])
   })
 })
 
@@ -97,9 +98,10 @@ describe('Drive repository', () => {
     expect(fetchMock.mock.calls[2][0]).toContain('uploadType=media')
     expect(fetchMock.mock.calls[2][1]).toMatchObject({ method: 'PATCH' })
     expect(JSON.parse(String(fetchMock.mock.calls[2][1]?.body))).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       tasks: [],
       habits: [],
+      habitEntries: [],
     })
     expect(fetchMock.mock.calls[1][1]?.body).not.toBeInstanceOf(FormData)
   })

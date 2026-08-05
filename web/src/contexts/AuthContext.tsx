@@ -9,7 +9,13 @@ import {
 } from 'react'
 import { accountOwnerId, accountStorageKey, migrateLegacyStorage } from '../lib/accountStorage'
 import { clearDriveCache, type TokenProvider } from '../lib/googleDrive'
-import { mergeHabits, useHabitsStore, type Habit } from '../store/habits'
+import {
+  mergeHabitEntries,
+  mergeHabits,
+  useHabitsStore,
+  type Habit,
+  type HabitEntry,
+} from '../store/habits'
 import { mergeTasks, useTasksStore, type PendingTask } from '../store/tasks'
 
 export interface AppUser {
@@ -91,6 +97,7 @@ function exportCurrentMemory(): void {
     exportedAt: new Date().toISOString(),
     tasks: useTasksStore.getState().tasks,
     habits: useHabitsStore.getState().habits,
+    habitEntries: useHabitsStore.getState().entries,
   }, null, 2)
   const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }))
   const link = document.createElement('a')
@@ -283,6 +290,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user?.isGuest) return true
     const guestTasks = useTasksStore.getState().tasks
     const guestHabits = useHabitsStore.getState().habits
+    const guestEntries = useHabitsStore.getState().entries
     if (guestTasks.length === 0 && guestHabits.length === 0) return true
 
     const choice = window.prompt(
@@ -312,6 +320,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const targetHabits = JSON.parse(
         localStorage.getItem(accountStorageKey(targetOwner, 'habits')) ?? '[]',
       ) as Habit[]
+      const targetEntries = JSON.parse(
+        localStorage.getItem(accountStorageKey(targetOwner, 'habitEntries')) ?? '[]',
+      ) as HabitEntry[]
       const mergedTasks = mergeTasks(
         guestTasks.map((task) => ({ ...task, synced: false })),
         targetTasks,
@@ -320,8 +331,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         guestHabits.map((habit) => ({ ...habit, synced: false })),
         targetHabits,
       )
+      const mergedEntries = mergeHabitEntries(
+        guestEntries.map((entry) => ({ ...entry, synced: false })),
+        targetEntries,
+      )
       localStorage.setItem(accountStorageKey(targetOwner, 'tasks'), JSON.stringify(mergedTasks))
       localStorage.setItem(accountStorageKey(targetOwner, 'habits'), JSON.stringify(mergedHabits))
+      localStorage.setItem(accountStorageKey(targetOwner, 'habitEntries'), JSON.stringify(mergedEntries))
       discardGuestAfterSwitchRef.current = false
       return true
     } catch {
@@ -357,6 +373,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             localStorage.removeItem(accountStorageKey('guest:local', 'tasks'))
             localStorage.removeItem(accountStorageKey('guest:local', 'habits'))
+            localStorage.removeItem(accountStorageKey('guest:local', 'habitEntries'))
           } finally {
             discardGuestAfterSwitchRef.current = false
           }
@@ -385,7 +402,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async (): Promise<boolean> => {
     if (!allowVolatileTransition()) return false
     authGenerationRef.current += 1
-    if (user && !user.isGuest && useTasksStore.getState().hasPendingChanges() && navigator.onLine) {
+    const hasPendingCloudChanges = useTasksStore.getState().hasPendingChanges() ||
+      useHabitsStore.getState().hasPendingChanges()
+    if (user && !user.isGuest && hasPendingCloudChanges && navigator.onLine) {
       try {
         await useTasksStore.getState().flushToDrive(getAccessToken)
       } catch {

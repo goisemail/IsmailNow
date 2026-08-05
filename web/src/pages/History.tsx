@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
-import { useHabitsStore } from '../store/habits'
+import { getHabitStats, useHabitsStore } from '../store/habits'
 import { useTasksStore } from '../store/tasks'
-import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar'
+import { Calendar as BigCalendar, dateFnsLocalizer, type View } from 'react-big-calendar'
 import format from 'date-fns/format'
 import parse from 'date-fns/parse'
 import startOfWeek from 'date-fns/startOfWeek'
@@ -16,22 +16,37 @@ const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales
 export default function History() {
   const storedHabits = useHabitsStore((state) => state.habits)
   const habits = storedHabits.filter((habit) => !habit.isDeleted)
+  const entries = useHabitsStore((state) => state.entries)
   const tasks = useTasksStore((state) => state.tasks)
   const [calendarMode, setCalendarMode] = useState<'day' | 'week' | 'month'>('month')
 
   const calendarEvents = useMemo(
-    () =>
-      tasks
+    () => {
+      const taskEvents = tasks
         .filter((task) => !task.isDeleted)
         .map((task, index) => {
         const start = new Date(`${task.startDate}T09:00:00`)
         start.setHours(9 + (index % 8), 0, 0, 0)
         const end = new Date(start)
         end.setHours(start.getHours() + 1)
-        return { title: task.title, start, end, id: task.id }
-      }),
-    [tasks],
+        return { title: task.title, start, end, id: `task:${task.id}` }
+      })
+      const habitsById = new Map(habits.map((habit) => [habit.id, habit]))
+      const habitEvents = entries
+        .filter((entry) => entry.state === 'completed' && !entry.isDeleted && habitsById.has(entry.habitId))
+        .map((entry) => {
+          const start = new Date(`${entry.date}T18:00:00`)
+          const end = new Date(start)
+          end.setMinutes(end.getMinutes() + 30)
+          return { title: `✓ ${habitsById.get(entry.habitId)?.name}`, start, end, id: `habit:${entry.id}` }
+        })
+      return [...taskEvents, ...habitEvents]
+    },
+    [entries, habits, tasks],
   )
+  const topHabit = habits
+    .map((habit) => ({ habit, streak: getHabitStats(habit, entries).bestStreak }))
+    .sort((a, b) => b.streak - a.streak)[0]
 
   return (
     <div className="history-page">
@@ -75,7 +90,9 @@ export default function History() {
             views={['day', 'week', 'month']}
             defaultView={calendarMode}
             view={calendarMode}
-            onView={(v: any) => setCalendarMode(v as any)}
+            onView={(view: View) => {
+              if (view === 'day' || view === 'week' || view === 'month') setCalendarMode(view)
+            }}
           />
         </div>
       </div>
@@ -92,10 +109,10 @@ export default function History() {
         </div>
         <div className="card" style={{ flex: 2 }}>
           <div className="text-muted" style={{ fontSize: '0.75rem', marginBottom: 4 }}>Top Streak</div>
-          {habits.length > 0 ? (
+          {topHabit ? (
             <div className="d-flex align-items-center gap-2">
-              <span style={{ fontSize: '0.9rem' }}>{habits.sort((a, b) => b.streak - a.streak)[0].name}</span>
-              <span className="badge bg-primary">{habits[0].streak} 🔥</span>
+              <span style={{ fontSize: '0.9rem' }}>{topHabit.habit.name}</span>
+              <span className="badge bg-primary">{topHabit.streak} 🔥</span>
             </div>
           ) : (
             <span className="text-muted" style={{ fontSize: '0.85rem' }}>No habits yet</span>
