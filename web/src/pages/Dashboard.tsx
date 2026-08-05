@@ -1,4 +1,4 @@
-import { useState, useEffect, type Dispatch, type SetStateAction } from 'react'
+import { useState, type Dispatch, type SetStateAction } from 'react'
 import {
   getHabitEntry,
   habitIsDueOnDate,
@@ -8,7 +8,6 @@ import {
   type HabitEntry,
 } from '../store/habits'
 import { useTasksStore, taskVisibleOnDate } from '../store/tasks'
-import { useAuth } from '../contexts/AuthContext'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import './Dashboard.css'
 import QuickAddSheet from '../components/QuickAddSheet'
@@ -100,26 +99,19 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
   const storedHabits = useHabitsStore((state) => state.habits)
   const entries = useHabitsStore((state) => state.entries)
   const habits = storedHabits.filter((habit) => habitIsDueOnDate(habit, selectedDate))
+  const pendingHabitIds = new Set(entries.filter((entry) => !entry.synced).map((entry) => entry.habitId))
   const logCompletion = useHabitsStore((state) => state.logCompletion)
   const addHabit = useHabitsStore((state) => state.addHabit)
 
   const tasks = useTasksStore((state) => state.tasks)
   const loading = useTasksStore((state) => state.loading)
-  const fetchForDate = useTasksStore((state) => state.fetchForDate)
   const addTask = useTasksStore((state) => state.addTask)
   const markComplete = useTasksStore((state) => state.markComplete)
   const unmarkComplete = useTasksStore((state) => state.unmarkComplete)
 
-  const { canSync, getAccessToken } = useAuth()
-
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [taskWizardOpen, setTaskWizardOpen] = useState(false)
   const [habitWizardOpen, setHabitWizardOpen] = useState(false)
-
-  // Fetch tasks from Google Sheets whenever the selected date changes
-  useEffect(() => {
-    fetchForDate(selectedDate, canSync ? getAccessToken : null)
-  }, [canSync, fetchForDate, getAccessToken, selectedDate])
 
   const handleQuickAddHabit = () => {
     setQuickAddOpen(false)
@@ -168,6 +160,7 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
                 key={habit.id}
                 habit={habit}
                 entry={getHabitEntry(entries, habit.id, selectedDate)}
+                pendingSync={!habit.synced || pendingHabitIds.has(habit.id)}
                 locked={selectedDate > todayLocal()}
                 onComplete={() => logCompletion(habit.id, selectedDate)}
               />
@@ -259,11 +252,12 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
 interface HabitCardProps {
   habit: Habit
   entry?: HabitEntry
+  pendingSync: boolean
   locked: boolean
   onComplete: () => void
 }
 
-function HabitCard({ habit, entry, locked, onComplete }: HabitCardProps) {
+function HabitCard({ habit, entry, pendingSync, locked, onComplete }: HabitCardProps) {
   const target = habit.evaluation.type === 'binary' ? 1 : habit.evaluation.target
   const count = entry?.value ?? 0
   const isComplete = entry?.state === 'completed'
@@ -273,7 +267,7 @@ function HabitCard({ habit, entry, locked, onComplete }: HabitCardProps) {
       <div className="habit-home-copy">
         <span className="habit-item-title">
           {habit.name}
-          {!habit.synced && <span className="task-offline-badge" title="Pending sync">●</span>}
+          {pendingSync && <span className="task-offline-badge" title="Pending sync">●</span>}
         </span>
         <span className="habit-home-meta">
           <strong>{count}/{target}</strong>

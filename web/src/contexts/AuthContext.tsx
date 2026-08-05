@@ -50,9 +50,11 @@ interface AuthContextValue {
   signOut: () => Promise<boolean>
   reauthorize: () => Promise<boolean>
   getAccessToken: TokenProvider
+  hasUsableAccessToken: () => boolean
 }
 
 const USER_KEY = 'ismailnow_user'
+const SESSION_TOKEN_KEY = 'ismailnow_google_token_session'
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string
 const TOKEN_EXPIRY_SKEW_MS = 60_000
 const SCOPES = [
@@ -63,6 +65,24 @@ const SCOPES = [
 ].join(' ')
 
 const AuthContext = createContext<AuthContextValue | null>(null)
+
+const REAUTHORIZATION_ERRORS = new Set([
+  'account_selection_required',
+  'consent_required',
+  'interaction_required',
+  'login_required',
+])
+
+class GoogleAuthorizationError extends Error {
+  constructor(public readonly code: string, message: string) {
+    super(message)
+    this.name = 'GoogleAuthorizationError'
+  }
+}
+
+function requiresReauthorization(error: unknown): boolean {
+  return error instanceof GoogleAuthorizationError && REAUTHORIZATION_ERRORS.has(error.code)
+}
 
 function parseStoredUser(value: string): AppUser | null {
   const parsed = JSON.parse(value) as Record<string, unknown>
@@ -75,6 +95,22 @@ function parseStoredUser(value: string): AppUser | null {
     ...(typeof parsed.email === 'string' ? { email: parsed.email } : {}),
     ...(typeof parsed.photoUrl === 'string' ? { photoUrl: parsed.photoUrl } : {}),
     ...(parsed.isGuest === true ? { isGuest: true } : {}),
+  }
+}
+
+function parseSessionToken(value: string): TokenState | null {
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>
+    if (typeof parsed.accessToken !== 'string' || !parsed.accessToken.trim()) return null
+    if (typeof parsed.ownerUid !== 'string' || !parsed.ownerUid.trim()) return null
+    if (typeof parsed.expiresAt !== 'number' || !Number.isFinite(parsed.expiresAt)) return null
+    return {
+      accessToken: parsed.accessToken,
+      ownerUid: parsed.ownerUid,
+      expiresAt: parsed.expiresAt,
+    }
+  } catch {
+    return null
   }
 }
 
@@ -111,6 +147,9 @@ async function fetchGoogleProfile(accessToken: string): Promise<GoogleProfile> {
   const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
     headers: { Authorization: `Bearer ${accessToken}` },
   })
+  if (response.status === 401 || response.status === 403) {
+    throw new GoogleAuthorizationError('login_required', 'Google authorization is no longer valid.')
+  }
   if (!response.ok) throw new Error(`Google profile request failed (${response.status}).`)
 
   const profile = (await response.json()) as Record<string, unknown>
@@ -136,8 +175,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [reauthRequired, setReauthRequired] = useState(false)
   const tokenRef = useRef<TokenState | null>(null)
   const tokenRequestRef = useRef<Promise<TokenState> | null>(null)
+  const tokenExpiryTimerRef = useRef<number | null>(null)
   const authGenerationRef = useRef(0)
   const discardGuestAfterSwitchRef = useRef(false)
+
+  const clearCachedToken = useCallback((requireReauthorization = false) => {
+    if (tokenExpiryTimerRef.current !== null) window.clearTimeout(tokenExpiryTimerRef.current)
+    tokenExpiryTimerRef.current = null
+    tokenRef.current = null
+    try {
+      sessionStorage.removeItem(SESSION_TOKEN_KEY)
+    } catch {
+      // The in-memory token is still cleared when browser storage is unavailable.
+    }
+    if (requireReauthorization) setReauthRequired(true)
+  }, [])
+
+  const cacheToken = useCallback((token: TokenState, ownerUid: string) => {
+    if (tokenExpiryTimerRef.current !== null) window.clearTimeout(tokenExpiryTimerRef.current)
+    tokenRef.current = { ...token, ownerUid }
+    try {
+      sessionStorage.setItem(SESSION_TOKEN_KEY, JSON.stringify({
+        accessToken: token.accessToken,
+        expiresAt: token.expiresAt,
+        ownerUid,
+      }))
+    } catch {
+      // Private browsing restrictions may leave refresh persistence unavailable.
+    }
+    setReauthRequired(false)
+    setAuthError(null)
+    const usableFor = token.expiresAt - TOKEN_EXPIRY_SKEW_MS - Date.now()
+    tokenExpiryTimerRef.current = window.setTimeout(() => {
+      tokenRef.current = null
+      tokenExpiryTimerRef.current = null
+      try {
+        sessionStorage.removeItem(SESSION_TOKEN_KEY)
+      } catch {
+        // The token is already unavailable from memory.
+      }
+      setReauthRequired(true)
+    }, Math.max(0, usableFor))
+  }, [])
 
   useEffect(() => {
     try {
@@ -148,24 +227,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           localStorage.setItem(USER_KEY, JSON.stringify(profile))
           activateLocalAccount(profile)
           setUser(profile)
+          if (profile.isGuest) {
+            clearCachedToken()
+            setReauthRequired(false)
+          } else {
+            let restoredToken: TokenState | null = null
+            try {
+              const rawToken = sessionStorage.getItem(SESSION_TOKEN_KEY)
+              restoredToken = rawToken ? parseSessionToken(rawToken) : null
+            } catch {
+              restoredToken = null
+            }
+            if (
+              restoredToken?.ownerUid === profile.uid &&
+              restoredToken.expiresAt - TOKEN_EXPIRY_SKEW_MS > Date.now()
+            ) {
+              cacheToken(restoredToken, profile.uid)
+            } else {
+              clearCachedToken()
+              setReauthRequired(true)
+            }
+          }
         } else {
           localStorage.removeItem(USER_KEY)
+          clearCachedToken()
         }
+      } else {
+        clearCachedToken()
       }
     } catch {
+      clearCachedToken()
       setAuthError('The saved session could not be restored.')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [cacheToken, clearCachedToken])
 
   useEffect(() => {
     const requireReauthorization = () => {
-      tokenRef.current = null
-      setReauthRequired(true)
+      clearCachedToken(true)
     }
     window.addEventListener('ismailnow:reauth-required', requireReauthorization)
     return () => window.removeEventListener('ismailnow:reauth-required', requireReauthorization)
+  }, [clearCachedToken])
+
+  useEffect(() => () => {
+    if (tokenExpiryTimerRef.current !== null) window.clearTimeout(tokenExpiryTimerRef.current)
   }, [])
 
   const requestAccessToken = useCallback((prompt = ''): Promise<TokenState> => {
@@ -186,7 +293,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         scope: SCOPES,
         callback: (response) => {
           if (response.error || !response.access_token) {
-            reject(new Error(response.error_description || response.error || 'Google authorization failed.'))
+            const code = response.error || 'authorization_failed'
+            reject(new GoogleAuthorizationError(
+              code,
+              response.error_description || response.error || 'Google authorization failed.',
+            ))
             return
           }
 
@@ -228,7 +339,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return token.accessToken
     }
 
-    tokenRef.current = null
+    clearCachedToken()
     const expectedUid = user.uid
     const generation = authGenerationRef.current
     try {
@@ -237,14 +348,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (generation !== authGenerationRef.current || profile.sub !== expectedUid) {
         throw new Error('Google authorization belongs to a different account. Please sign in again.')
       }
-      tokenRef.current = { ...requestedToken, ownerUid: expectedUid }
-      setReauthRequired(false)
+      cacheToken(requestedToken, expectedUid)
       return requestedToken.accessToken
     } catch (error) {
-      setReauthRequired(true)
+      if (requiresReauthorization(error)) setReauthRequired(true)
+      setAuthError(error instanceof Error ? error.message : 'Google authorization failed.')
       throw error
     }
-  }, [requestAccessToken, user])
+  }, [cacheToken, clearCachedToken, requestAccessToken, user])
+
+  const hasUsableAccessToken = useCallback(() => {
+    const token = tokenRef.current
+    return Boolean(
+      user &&
+      !user.isGuest &&
+      token?.ownerUid === user.uid &&
+      token.expiresAt - TOKEN_EXPIRY_SKEW_MS > Date.now(),
+    )
+  }, [user])
 
   const persistAndActivateAccount = (profile: AppUser): void => {
     const previousStoredUser = localStorage.getItem(USER_KEY)
@@ -366,8 +487,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (!allowVolatileTransition() || !prepareGuestTransition(newUser)) return
         persistAndActivateAccount(newUser)
-        tokenRef.current = { ...requestedToken, ownerUid: newUser.uid }
-        setReauthRequired(false)
+        cacheToken(requestedToken, newUser.uid)
         setUser(newUser)
         if (discardGuestAfterSwitchRef.current) {
           try {
@@ -388,7 +508,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInGuest = () => {
     if (!allowVolatileTransition()) return
     authGenerationRef.current += 1
-    tokenRef.current = null
+    clearCachedToken()
+    setReauthRequired(false)
     const guest: AppUser = { uid: 'guest', name: 'Guest', isGuest: true }
     try {
       persistAndActivateAccount(guest)
@@ -427,7 +548,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.google.accounts.oauth2.revoke(token)
     }
 
-    tokenRef.current = null
+    clearCachedToken()
     tokenRequestRef.current = null
     clearActiveAccount()
     setUser(null)
@@ -440,14 +561,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user || user.isGuest) return false
     const generation = authGenerationRef.current
     try {
-      const requestedToken = await requestAccessToken('consent')
+      const requestedToken = await requestAccessToken('')
       const profile = await fetchGoogleProfile(requestedToken.accessToken)
       if (generation !== authGenerationRef.current || profile.sub !== user.uid) {
         throw new Error('Google authorization belongs to a different account.')
       }
-      tokenRef.current = { ...requestedToken, ownerUid: user.uid }
-      setReauthRequired(false)
-      setAuthError(null)
+      cacheToken(requestedToken, user.uid)
       return true
     } catch (error) {
       setReauthRequired(true)
@@ -469,6 +588,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signOut,
         reauthorize,
         getAccessToken,
+        hasUsableAccessToken,
       }}
     >
       {children}
