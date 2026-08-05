@@ -108,7 +108,7 @@ function AppContent() {
       )}
       {reauthRequired && (
         <div className="offline-banner" role="alert">
-          Google Drive authorization expired.
+          Cloud sync is paused.
           <button type="button" className="btn btn-sm btn-light ms-2" onClick={handleReconnect}>
             Reconnect Google Drive
           </button>

@@ -12,6 +12,7 @@ import {
   type TokenProvider,
 } from './googleDrive'
 import type { PendingTask } from '../store/tasks'
+import type { Habit, HabitEntry } from '../store/habits'
 
 const getToken: TokenProvider = vi.fn(async () => 'token')
 
@@ -170,7 +171,7 @@ describe('Drive repository', () => {
     expect(snapshot.duplicateFileIds).toEqual(['file-2'])
   })
 
-  it('verifies uploaded task content', async () => {
+  it('verifies uploaded task, habit, and habit-entry content', async () => {
     const task: PendingTask = {
       id: 'task-1',
       title: 'Task',
@@ -179,15 +180,55 @@ describe('Drive repository', () => {
       updatedAt: '2026-07-28T00:00:00.000Z',
       synced: true,
     }
+    const habit: Habit = {
+      id: 'habit-1',
+      name: 'Read',
+      color: '#198754',
+      category: 'Study',
+      priority: 0,
+      evaluation: { type: 'binary' },
+      schedule: { type: 'everyDay' },
+      startDate: '2026-07-28',
+      createdAt: '2026-07-28T00:00:00.000Z',
+      updatedAt: '2026-07-28T00:00:00.000Z',
+      synced: true,
+    }
+    const habitEntry: HabitEntry = {
+      id: 'habit-1:2026-07-28',
+      habitId: 'habit-1',
+      date: '2026-07-28',
+      state: 'completed',
+      value: 1,
+      targetSnapshot: 1,
+      createdAt: '2026-07-28T12:00:00.000Z',
+      updatedAt: '2026-07-28T12:00:00.000Z',
+      synced: true,
+    }
     const fetchMock = vi.mocked(fetch)
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ id: 'file-1', version: '1' }, 200, { ETag: 'one' }))
       .mockResolvedValueOnce(jsonResponse({ id: 'file-1', version: '2' }))
-      .mockResolvedValueOnce(new Response(JSON.stringify([{ ...task, synced: undefined }]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        schemaVersion: 3,
+        tasks: [{ ...task, synced: undefined }],
+        habits: [{ ...habit, synced: undefined }],
+        habitEntries: [{ ...habitEntry, synced: undefined }],
+      }), { status: 200 }))
       .mockResolvedValueOnce(jsonResponse({ id: 'file-1', version: '3' }))
 
-    await expect(saveTasksToDrive(getToken, [task], { id: 'file-1', version: '1' }))
+    await expect(saveTasksToDrive(
+      getToken,
+      [task],
+      { id: 'file-1', version: '1' },
+      [habit],
+      [habitEntry],
+    ))
       .resolves.toMatchObject({ version: '2' })
     expect(fetchMock.mock.calls[1][1]?.headers).toMatchObject({ 'If-Match': 'one' })
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toMatchObject({
+      schemaVersion: 3,
+      habits: [{ id: 'habit-1', name: 'Read' }],
+      habitEntries: [{ id: 'habit-1:2026-07-28', state: 'completed' }],
+    })
   })
 })

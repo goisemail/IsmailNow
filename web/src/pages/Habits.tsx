@@ -17,6 +17,7 @@ export default function Habits() {
   const storedHabits = useHabitsStore((state) => state.habits)
   const entries = useHabitsStore((state) => state.entries)
   const habits = storedHabits.filter((habit) => !habit.isDeleted && !habit.archivedAt)
+  const pendingHabitIds = new Set(entries.filter((entry) => !entry.synced).map((entry) => entry.habitId))
   const addHabit = useHabitsStore((state) => state.addHabit)
   const deleteHabit = useHabitsStore((state) => state.deleteHabit)
   const logCompletion = useHabitsStore((state) => state.logCompletion)
@@ -57,6 +58,7 @@ export default function Habits() {
               key={habit.id}
               habit={habit}
               entry={getHabitEntry(entries, habit.id, todayLocal())}
+              pendingSync={!habit.synced || pendingHabitIds.has(habit.id)}
               stats={getHabitStats(habit, entries)}
               onOpen={() => navigate(`/habit/${habit.id}`)}
               onLog={() => logCompletion(habit.id)}
@@ -83,6 +85,7 @@ export default function Habits() {
 interface HabitRowProps {
   habit: Habit
   entry?: HabitEntry
+  pendingSync: boolean
   stats: HabitStats
   onOpen: () => void
   onLog: () => void
@@ -90,7 +93,7 @@ interface HabitRowProps {
   onDelete: () => void
 }
 
-function HabitRow({ habit, entry, stats, onOpen, onLog, onEdit, onDelete }: HabitRowProps) {
+function HabitRow({ habit, entry, pendingSync, stats, onOpen, onLog, onEdit, onDelete }: HabitRowProps) {
   const target = habit.evaluation.type === 'binary' ? 1 : habit.evaluation.target
   const count = entry?.value ?? 0
   return (
@@ -113,7 +116,7 @@ function HabitRow({ habit, entry, stats, onOpen, onLog, onEdit, onDelete }: Habi
           <div className="habit-manage-title-wrap">
             <span className="habit-item-title">
               {habit.name}
-              {!habit.synced && <span className="habit-pending-dot" title="Pending sync">●</span>}
+              {pendingSync && <span className="habit-pending-dot" title="Pending sync">●</span>}
             </span>
             <span className="habit-stat-hint"><BarChart3 size={13} /> View statistics</span>
           </div>

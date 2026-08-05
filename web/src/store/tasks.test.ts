@@ -18,14 +18,17 @@ vi.mock('../lib/googleDrive', () => {
 })
 
 import { mergeTasks, useTasksStore, type PendingTask } from './tasks'
+import { todayLocal, useHabitsStore } from './habits'
 
 describe('task synchronization coordinator', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     localStorage.clear()
     drive.loads.mockReset()
     drive.saves.mockReset().mockResolvedValue({ id: 'file', version: '2' })
     useTasksStore.getState().clearMemory()
+    useHabitsStore.getState().clearMemory()
     useTasksStore.getState().load('google:user-1')
+    await useHabitsStore.getState().load('google:user-1')
   })
 
   it('serializes overlapping requests and preserves an edit made in flight', async () => {
@@ -72,6 +75,34 @@ describe('task synchronization coordinator', () => {
     expect(useTasksStore.getState().tasks).toEqual([])
     expect(JSON.parse(localStorage.getItem(accountStorageKey('google:user-1', 'tasks')) ?? '[]'))
       .toHaveLength(1)
+  })
+
+  it('uploads and reconciles habit definitions and dated entries', async () => {
+    const date = todayLocal()
+    useHabitsStore.getState().addHabit({ name: 'Read', color: '#198754', startDate: date })
+    const habitId = useHabitsStore.getState().habits[0].id
+    useHabitsStore.getState().logCompletion(habitId, date)
+    drive.loads.mockResolvedValue({
+      tasks: [],
+      habits: [],
+      habitEntries: [],
+      duplicateFileIds: [],
+      file: { id: 'file', version: '1' },
+    })
+
+    await useTasksStore.getState().flushToDrive(async () => 'token')
+
+    const uploadedHabits = drive.saves.mock.calls[0][3]
+    const uploadedEntries = drive.saves.mock.calls[0][4]
+    expect(uploadedHabits).toMatchObject([{ id: habitId, name: 'Read', synced: true }])
+    expect(uploadedEntries).toMatchObject([{
+      habitId,
+      date,
+      state: 'completed',
+      synced: true,
+    }])
+    expect(useHabitsStore.getState().habits.every((habit) => habit.synced)).toBe(true)
+    expect(useHabitsStore.getState().entries.every((entry) => entry.synced)).toBe(true)
   })
 
   it('allows a newer task version to clear an optional field', () => {

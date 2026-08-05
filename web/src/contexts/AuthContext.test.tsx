@@ -15,6 +15,7 @@ function AuthProbe() {
     signInGuest,
     signOut,
     getAccessToken,
+    reauthorize,
   } = useAuth()
   return (
     <div>
@@ -25,6 +26,7 @@ function AuthProbe() {
       <button onClick={signInGuest}>Use guest</button>
       <button onClick={() => void signOut()}>Sign out</button>
       <button onClick={() => void getAccessToken().catch(() => undefined)}>Authorize Drive</button>
+      <button onClick={() => void reauthorize()}>Reconnect Drive</button>
     </div>
   )
 }
@@ -32,6 +34,7 @@ function AuthProbe() {
 describe('AuthProvider', () => {
   beforeEach(() => {
     localStorage.clear()
+    sessionStorage.clear()
     useTasksStore.getState().clearMemory()
     useHabitsStore.getState().clearMemory()
     window.google = undefined
@@ -80,6 +83,47 @@ describe('AuthProvider', () => {
       name: 'Valid User',
       email: 'user@example.com',
     }))
+  })
+
+  it('restores a valid session token after a provider remount', async () => {
+    const initTokenClient = vi.fn((config: Parameters<NonNullable<Window['google']>['accounts']['oauth2']['initTokenClient']>[0]) => ({
+      requestAccessToken: () => config.callback({ access_token: 'session-token', expires_in: 3600 }),
+    }))
+    window.google = {
+      accounts: { oauth2: { initTokenClient, revoke: vi.fn() } },
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ sub: 'session-user', name: 'User' }), { status: 200 }))
+
+    const firstRender = render(<AuthProvider><AuthProbe /></AuthProvider>)
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('session-user'))
+    expect(sessionStorage.getItem('ismailnow_google_token_session')).toContain('session-token')
+    firstRender.unmount()
+
+    render(<AuthProvider><AuthProbe /></AuthProvider>)
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('session-user'))
+    expect(screen.getByTestId('reauth')).toHaveTextContent('')
+    await userEvent.click(screen.getByRole('button', { name: 'Authorize Drive' }))
+
+    expect(initTokenClient).toHaveBeenCalledOnce()
+    expect(fetch).toHaveBeenCalledOnce()
+  })
+
+  it.each([
+    ['another account', 'other-user', Date.now() + 3_600_000],
+    ['an expired token', 'session-user', Date.now() - 1],
+  ])('rejects a session token belonging to %s', async (_case, ownerUid, expiresAt) => {
+    localStorage.setItem('ismailnow_user', JSON.stringify({ uid: 'session-user', name: 'User' }))
+    sessionStorage.setItem('ismailnow_google_token_session', JSON.stringify({
+      accessToken: 'invalid-session-token',
+      ownerUid,
+      expiresAt,
+    }))
+
+    render(<AuthProvider><AuthProbe /></AuthProvider>)
+
+    await waitFor(() => expect(screen.getByTestId('reauth')).toHaveTextContent('required'))
+    expect(sessionStorage.getItem('ismailnow_google_token_session')).toBeNull()
   })
 
   it('does not replace local account state when profile validation fails', async () => {
@@ -288,5 +332,33 @@ describe('AuthProvider', () => {
     window.dispatchEvent(new Event('ismailnow:reauth-required'))
 
     await waitFor(() => expect(screen.getByTestId('reauth')).toHaveTextContent('required'))
+  })
+
+  it('reconnects without forcing the Google consent screen', async () => {
+    localStorage.setItem('ismailnow_user', JSON.stringify({ uid: 'reauth-user', name: 'User' }))
+    const requestAccessToken = vi.fn((options?: { prompt?: string }) => {
+      tokenConfig?.callback({ access_token: 'renewed-token', expires_in: 3600 })
+      expect(options?.prompt).toBe('')
+    })
+    let tokenConfig: Parameters<NonNullable<Window['google']>['accounts']['oauth2']['initTokenClient']>[0] | undefined
+    window.google = {
+      accounts: {
+        oauth2: {
+          initTokenClient: (config) => {
+            tokenConfig = config
+            return { requestAccessToken }
+          },
+          revoke: vi.fn(),
+        },
+      },
+    }
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ sub: 'reauth-user', name: 'User' }), { status: 200 }))
+
+    render(<AuthProvider><AuthProbe /></AuthProvider>)
+    await waitFor(() => expect(screen.getByTestId('reauth')).toHaveTextContent('required'))
+    await userEvent.click(screen.getByRole('button', { name: 'Reconnect Drive' }))
+
+    await waitFor(() => expect(screen.getByTestId('reauth')).toHaveTextContent(''))
+    expect(requestAccessToken).toHaveBeenCalledOnce()
   })
 })

@@ -12,7 +12,7 @@ export default function Settings() {
   const tasks = useTasksStore((state) => state.tasks)
   const deleteTask = useTasksStore((state) => state.deleteTask)
   const restoreBackup = useTasksStore((state) => state.restoreBackup)
-  const { canSync, getAccessToken } = useAuth()
+  const { canSync, getAccessToken, hasUsableAccessToken, reauthRequired } = useAuth()
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [backups, setBackups] = useState<DriveBackup[]>([])
@@ -20,11 +20,11 @@ export default function Settings() {
   const [restoring, setRestoring] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!canSync) return
+    if (!canSync || reauthRequired || !hasUsableAccessToken()) return
     listDriveBackups(getAccessToken)
       .then(setBackups)
       .catch(() => setBackupError('Backup history could not be loaded.'))
-  }, [canSync, getAccessToken])
+  }, [canSync, getAccessToken, hasUsableAccessToken, reauthRequired])
 
   const handleExport = () => {
     const data = {
