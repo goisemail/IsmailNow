@@ -107,17 +107,20 @@ Output files will be in `web/dist/`
 - Auth state managed via React Context
 
 ### Data Storage & Sync
-- **Local Storage**: IndexedDB for offline data
-- **Cloud Storage**: Google Drive JSON file
+- **Local Storage**: Account-scoped `localStorage` for offline data
+- **Cloud Storage**: Versioned Google Drive JSON document for tasks and habits
 - **Sync Strategy**: 
   - Periodic auto-sync when online
   - Manual sync via "Sync to Cloud" button in sidebar
   - Merges local and remote data on sync
+  - Serializes browser writes and detects Drive version changes
+  - Keeps recovery snapshots before changed writes and restores
+  - Requires a transactional backend for strict simultaneous multi-device consistency
 
 ### State Management
 - Tasks and habits stored in Zustand stores
 - Real-time updates with React hooks
-- Persistent storage with Drive sync
+- Persistent local storage with task-and-habit Drive sync
 
 ## Pages & Features
 

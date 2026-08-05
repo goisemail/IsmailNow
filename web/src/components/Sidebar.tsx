@@ -51,7 +51,7 @@ export default function Sidebar({
         <Link to="/settings" className="sidebar-item" onClick={onClose}>
           Settings
         </Link>
-        <span className="sidebar-item">Account and Backups</span>
+        <span className="sidebar-item">Account and Sync</span>
 
         <div className="sidebar-divider" />
 

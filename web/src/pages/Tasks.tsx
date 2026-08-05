@@ -3,7 +3,7 @@ import { useTasksStore, PendingTask } from '../store/tasks'
 import { useAuth } from '../contexts/AuthContext'
 import { Pencil, Trash2 } from 'lucide-react'
 import { formatDate } from '../utils/date'
-import { getReadableTextColor } from '../utils/color'
+import { getContrastingAccentColor } from '../utils/color'
 import TaskWizard from '../components/TaskWizard'
 import './Tasks.css'
 
@@ -14,9 +14,7 @@ export default function Tasks() {
   const markComplete = useTasksStore((state) => state.markComplete)
   const unmarkComplete = useTasksStore((state) => state.unmarkComplete)
   const deleteTask = useTasksStore((state) => state.deleteTask)
-
-  const { user } = useAuth()
-  const token = user?.accessToken ?? null
+  const { canSync, getAccessToken } = useAuth()
 
   const today = formatDate(new Date())
 
@@ -27,9 +25,9 @@ export default function Tasks() {
 
   const handleToggle = (task: PendingTask) => {
     if (task.completedDate) {
-      unmarkComplete(task.id, token)
+      unmarkComplete(task.id)
     } else {
-      markComplete(task.id, today, token)
+      markComplete(task.id, today)
     }
   }
 
@@ -71,7 +69,7 @@ export default function Tasks() {
       return
     }
 
-    await addTask(taskName, today, token)
+    await addTask(taskName, today)
   }
 
   return (
@@ -97,7 +95,7 @@ export default function Tasks() {
                     today={today}
                     onToggle={() => handleToggle(task)}
                     onEdit={() => handleOpenEditTask(task)}
-                    onDelete={() => deleteTask(task.id, token)}
+                    onDelete={() => deleteTask(task.id, canSync ? getAccessToken : null)}
                   />
                 ))}
               </div>
@@ -115,7 +113,7 @@ export default function Tasks() {
                     today={today}
                     onToggle={() => handleToggle(task)}
                     onEdit={() => handleOpenEditTask(task)}
-                    onDelete={() => deleteTask(task.id, token)}
+                    onDelete={() => deleteTask(task.id, canSync ? getAccessToken : null)}
                     canEdit={false}
                   />
                 ))}
@@ -169,17 +167,15 @@ interface TaskRowProps {
 
 function TaskRow({ task, onToggle, onEdit, onDelete, canEdit = true }: TaskRowProps) {
   const isDone = !!task.completedDate
-  const titleColor = getReadableTextColor(task.backgroundColor)
 
   return (
     <div
       className="task-row"
-      style={{ backgroundColor: task.backgroundColor ?? '#f8f9fa' }}
       data-testid={`task-row-${task.id}`}
     >
+      <span className="task-color-bar" style={{ backgroundColor: getContrastingAccentColor(task.backgroundColor) }} aria-hidden="true" />
       <span
         className={'task-title' + (isDone ? ' completed' : '')}
-        style={{ color: isDone ? '#6c757d' : titleColor }}
       >
         {task.title}
         {!task.synced && (

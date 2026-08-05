@@ -1,23 +1,34 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useHabitsStore } from '../store/habits'
 import { useTasksStore } from '../store/tasks'
 import { useAuth } from '../contexts/AuthContext'
 import { Trash2 } from 'lucide-react'
+import { listDriveBackups, type DriveBackup } from '../lib/googleDrive'
 
 export default function Settings() {
-  const habits = useHabitsStore((state) => state.habits)
+  const allHabits = useHabitsStore((state) => state.habits)
+  const habits = allHabits.filter((habit) => !habit.isDeleted)
   const deleteHabit = useHabitsStore((state) => state.deleteHabit)
   const tasks = useTasksStore((state) => state.tasks)
   const deleteTask = useTasksStore((state) => state.deleteTask)
-
-  const { user } = useAuth()
-  const token = user?.accessToken ?? null
+  const restoreBackup = useTasksStore((state) => state.restoreBackup)
+  const { canSync, getAccessToken } = useAuth()
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [backups, setBackups] = useState<DriveBackup[]>([])
+  const [backupError, setBackupError] = useState<string | null>(null)
+  const [restoring, setRestoring] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!canSync) return
+    listDriveBackups(getAccessToken)
+      .then(setBackups)
+      .catch(() => setBackupError('Backup history could not be loaded.'))
+  }, [canSync, getAccessToken])
 
   const handleExport = () => {
     const data = {
-      habits,
+      habits: allHabits,
       tasks,
       exportDate: new Date().toISOString(),
     }
@@ -28,6 +39,20 @@ export default function Settings() {
     link.href = url
     link.download = `habbitnow-backup-${new Date().toISOString().split('T')[0]}.json`
     link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleRestore = async (backup: DriveBackup) => {
+    if (!window.confirm(`Restore ${new Date(backup.createdTime).toLocaleString()}? A safety snapshot will be created first.`)) return
+    setRestoring(backup.id)
+    setBackupError(null)
+    try {
+      await restoreBackup(getAccessToken, backup.id)
+    } catch {
+      setBackupError('Backup restore failed. Your current data was not cleared.')
+    } finally {
+      setRestoring(null)
+    }
   }
 
   const visibleTasks = tasks.filter((t) => !t.isDeleted)
@@ -48,6 +73,31 @@ export default function Settings() {
           <p className="text-muted small">
             Download all your habits and tasks as a backup
           </p>
+          {canSync && (
+            <div className="mt-3">
+              <h6>Drive recovery history</h6>
+              {backupError && <div className="alert alert-warning py-2">{backupError}</div>}
+              {backups.length === 0 ? (
+                <p className="text-muted small mb-0">No recovery snapshots yet.</p>
+              ) : (
+                <div className="list-group">
+                  {backups.map((backup) => (
+                    <div key={backup.id} className="list-group-item d-flex justify-content-between align-items-center">
+                      <span>{new Date(backup.createdTime).toLocaleString()}</span>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-outline-primary"
+                        disabled={restoring !== null}
+                        onClick={() => handleRestore(backup)}
+                      >
+                        {restoring === backup.id ? 'Restoring...' : 'Restore'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -99,7 +149,7 @@ export default function Settings() {
                     className="btn btn-sm btn-danger"
                     onClick={() =>
                       confirmDelete === task.id
-                        ? (deleteTask(task.id, token), setConfirmDelete(null))
+                        ? (deleteTask(task.id, canSync ? getAccessToken : null), setConfirmDelete(null))
                         : setConfirmDelete(task.id)
                     }
                     data-testid={`delete-task-${task.id}`}

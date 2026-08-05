@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect } from 'react'
 import { useTasksStore } from '../store/tasks'
 import { useAuth } from '../contexts/AuthContext'
 import { useOnlineStatus } from './useOnlineStatus'
@@ -21,19 +21,14 @@ const FLUSH_INTERVAL_MS = 60 * 60 * 1000 // 1 hour
  */
 export function useDriveSync(): void {
   const flushToDrive = useTasksStore((state) => state.flushToDrive)
-  const { user } = useAuth()
+  const { canSync, getAccessToken, reauthRequired } = useAuth()
   const isOnline = useOnlineStatus()
-
-  // Keep a stable ref to the current token so event listeners always see the
-  // latest value without needing to be re-registered on every token change.
-  const tokenRef = useRef<string | null>(null)
-  tokenRef.current = user?.accessToken ?? null
 
   // ── Periodic flush + event listeners ────────────────────────────────────────
   useEffect(() => {
     const flush = () => {
-      if (tokenRef.current && navigator.onLine) {
-        flushToDrive(tokenRef.current).catch(console.error)
+      if (canSync && !reauthRequired && navigator.onLine) {
+        flushToDrive(getAccessToken).catch(console.error)
       }
     }
 
@@ -50,12 +45,12 @@ export function useDriveSync(): void {
       clearInterval(intervalId)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [flushToDrive])
+  }, [canSync, flushToDrive, getAccessToken, reauthRequired])
 
   // ── Flush immediately when network comes back online ─────────────────────────
   useEffect(() => {
-    if (isOnline && tokenRef.current) {
-      flushToDrive(tokenRef.current).catch(console.error)
+    if (isOnline && canSync && !reauthRequired) {
+      flushToDrive(getAccessToken).catch(console.error)
     }
-  }, [isOnline, flushToDrive])
+  }, [canSync, getAccessToken, isOnline, flushToDrive, reauthRequired])
 }

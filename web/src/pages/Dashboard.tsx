@@ -1,12 +1,20 @@
 import { useState, useEffect, type Dispatch, type SetStateAction } from 'react'
-import { useHabitsStore, Habit } from '../store/habits'
+import {
+  getHabitEntry,
+  habitIsDueOnDate,
+  todayLocal,
+  useHabitsStore,
+  type Habit,
+  type HabitEntry,
+} from '../store/habits'
 import { useTasksStore, taskVisibleOnDate } from '../store/tasks'
 import { useAuth } from '../contexts/AuthContext'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import './Dashboard.css'
 import QuickAddSheet from '../components/QuickAddSheet'
+import HabitWizard from '../components/HabitWizard'
 import TaskWizard from '../components/TaskWizard'
-import { getReadableTextColor } from '../utils/color'
+import { getContrastingAccentColor } from '../utils/color'
 
 interface WeekDay {
   key: string
@@ -89,8 +97,11 @@ export function DashboardWeekNavigator({
 }
 
 export default function Dashboard({ selectedDate }: DashboardProps) {
-  const habits = useHabitsStore((state) => state.habits)
+  const storedHabits = useHabitsStore((state) => state.habits)
+  const entries = useHabitsStore((state) => state.entries)
+  const habits = storedHabits.filter((habit) => habitIsDueOnDate(habit, selectedDate))
   const logCompletion = useHabitsStore((state) => state.logCompletion)
+  const addHabit = useHabitsStore((state) => state.addHabit)
 
   const tasks = useTasksStore((state) => state.tasks)
   const loading = useTasksStore((state) => state.loading)
@@ -99,19 +110,20 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
   const markComplete = useTasksStore((state) => state.markComplete)
   const unmarkComplete = useTasksStore((state) => state.unmarkComplete)
 
-  const { user } = useAuth()
-  const token = user?.accessToken ?? null
+  const { canSync, getAccessToken } = useAuth()
 
   const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [taskWizardOpen, setTaskWizardOpen] = useState(false)
+  const [habitWizardOpen, setHabitWizardOpen] = useState(false)
 
   // Fetch tasks from Google Sheets whenever the selected date changes
   useEffect(() => {
-    fetchForDate(selectedDate, token)
-  }, [selectedDate, token])
+    fetchForDate(selectedDate, canSync ? getAccessToken : null)
+  }, [canSync, fetchForDate, getAccessToken, selectedDate])
 
   const handleQuickAddHabit = () => {
-    window.location.href = '/habit/new'
+    setQuickAddOpen(false)
+    setHabitWizardOpen(true)
   }
 
   const handleQuickAddTask = () => {
@@ -125,14 +137,14 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
   }
 
   const handleSaveTask = async (taskName: string) => {
-    await addTask(taskName, selectedDate, token)
+    await addTask(taskName, selectedDate)
   }
 
   const handleToggle = (taskId: string, isCompleted: boolean) => {
     if (isCompleted) {
-      unmarkComplete(taskId, token)
+      unmarkComplete(taskId)
     } else {
-      markComplete(taskId, selectedDate, token)
+      markComplete(taskId, selectedDate)
     }
   }
 
@@ -150,14 +162,15 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
             No habits yet. Start by creating one!
           </div>
         ) : (
-          <div className="row g-3">
+          <div className="habit-list">
             {habits.map((habit) => (
-              <div key={habit.id} className="col-12">
-                <HabitCard
-                  habit={habit}
-                  onComplete={() => logCompletion(habit.id)}
-                />
-              </div>
+              <HabitCard
+                key={habit.id}
+                habit={habit}
+                entry={getHabitEntry(entries, habit.id, selectedDate)}
+                locked={selectedDate > todayLocal()}
+                onComplete={() => logCompletion(habit.id, selectedDate)}
+              />
             ))}
           </div>
         )}
@@ -176,17 +189,15 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
           <div className="task-list">
             {tasksForDate.map((task) => {
               const isCompleted = task.completedDate === selectedDate
-              const titleColor = getReadableTextColor(task.backgroundColor)
               return (
                 <div
                   key={task.id}
                   className="task-row"
-                  style={{ backgroundColor: task.backgroundColor ?? '#f8f9fa' }}
                   data-testid={'task-' + task.id}
                 >
+                  <span className="task-color-bar" style={{ backgroundColor: getContrastingAccentColor(task.backgroundColor) }} aria-hidden="true" />
                   <span
                     className={'task-title' + (isCompleted ? ' completed' : '')}
-                    style={{ color: isCompleted ? '#6c757d' : titleColor }}
                   >
                     {task.title}
                     {!task.synced && (
@@ -234,6 +245,11 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
         onClose={() => setTaskWizardOpen(false)}
         onSave={handleSaveTask}
       />
+      <HabitWizard
+        open={habitWizardOpen}
+        onClose={() => setHabitWizardOpen(false)}
+        onSave={(draft) => addHabit(draft)}
+      />
     </div>
   )
 }
@@ -242,43 +258,38 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
 
 interface HabitCardProps {
   habit: Habit
+  entry?: HabitEntry
+  locked: boolean
   onComplete: () => void
 }
 
-function HabitCard({ habit, onComplete }: HabitCardProps) {
+function HabitCard({ habit, entry, locked, onComplete }: HabitCardProps) {
+  const target = habit.evaluation.type === 'binary' ? 1 : habit.evaluation.target
+  const count = entry?.value ?? 0
+  const isComplete = entry?.state === 'completed'
   return (
-    <div className="habit-card card" data-testid={'habitCard-' + habit.id}>
-      <div className="card-body">
-        <div className="d-flex justify-content-between align-items-start mb-2">
-          <h3 className="card-title h6 mb-0">{habit.name}</h3>
-          <span className="badge bg-secondary">{habit.streak} 🔥</span>
-        </div>
-
-        <div className="progress mb-2" style={{ height: '24px' }}>
-          <div
-            className="progress-bar"
-            role="progressbar"
-            style={{ width: (habit.progress * 100) + '%', backgroundColor: habit.color }}
-            aria-valuenow={habit.progress * 100}
-            aria-valuemin={0}
-            aria-valuemax={100}
-          />
-        </div>
-
-        <div className="d-flex justify-content-between align-items-center">
-          <small className="text-muted">
-            {(habit.progress * 100).toFixed(0)}% complete
-          </small>
-          <button
-            className="btn btn-sm"
-            style={{ backgroundColor: habit.color, color: 'white', border: 'none' }}
-            onClick={onComplete}
-            data-testid={'habitLog-' + habit.id}
-          >
-            Log
-          </button>
-        </div>
+    <div className="habit-home-row" data-testid={'habitCard-' + habit.id}>
+      <span className="habit-color-bar" style={{ backgroundColor: habit.color }} aria-hidden="true" />
+      <div className="habit-home-copy">
+        <span className="habit-item-title">
+          {habit.name}
+          {!habit.synced && <span className="task-offline-badge" title="Pending sync">●</span>}
+        </span>
+        <span className="habit-home-meta">
+          <strong>{count}/{target}</strong>
+          <span>{entry?.state ?? 'pending'}</span>
+        </span>
       </div>
+      <button
+        className={`task-toggle${isComplete ? ' done' : ''}`}
+        onClick={onComplete}
+        disabled={locked}
+        aria-label={`Log ${habit.name}`}
+        title={locked ? 'Future habits are locked' : (isComplete ? 'Habit complete' : 'Record progress')}
+        data-testid={'habitLog-' + habit.id}
+      >
+        {isComplete && '✓'}
+      </button>
     </div>
   )
 }

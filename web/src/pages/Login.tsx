@@ -27,7 +27,7 @@ export default function Login() {
         <p className="login-subtitle">
           Your personal task tracker.
           <br />
-          Tasks are saved directly to <strong>your</strong> Google Drive.
+          Tasks and habits sync directly to <strong>your</strong> Google Drive.
         </p>
 
         <button
@@ -65,7 +65,7 @@ export default function Login() {
         </button>
 
         <p className="login-privacy">
-          Google sign-in stores tasks in your Drive. Guest mode stores only on this device.
+          Google sign-in syncs tasks and habits to your Drive. Guest mode stays on this device.
         </p>
       </div>
     </div>

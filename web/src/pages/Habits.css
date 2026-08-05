@@ -2,22 +2,8 @@
   padding-bottom: 1rem;
 }
 
-.habit-row {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border: none;
-  transition: box-shadow 0.2s;
-}
-
-.habit-row:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-}
-
-.habit-color-dot {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.habits-page .habit-list {
+  margin-bottom: 5rem;
 }
 
 @media (max-width: 576px) {
