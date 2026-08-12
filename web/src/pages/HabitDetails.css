@@ -140,15 +140,38 @@
   background: var(--habit-color, #e72372);
 }
 
-.habit-stat-log-btn {
-  width: 100%;
-  padding: 12px 16px;
+.habit-details-state-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+}
+
+.habit-details-state-action > button:last-child {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: flex-start;
+  flex-direction: column;
+  padding: 0;
   border: 0;
-  border-radius: 9px;
-  color: #ffffff;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 700;
+  color: #212529;
+  background: transparent;
+  text-align: left;
+  text-transform: capitalize;
+}
+
+.habit-details-state-action > button:last-child span {
+  color: #868e96;
+  font-size: 11px;
+  text-transform: none;
+}
+
+.habit-details-state-action > button:last-child:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -176,6 +199,14 @@
 
   .habit-counter-visual span {
     background: #495057;
+  }
+
+  .habit-details-state-action {
+    border-color: #495057;
+  }
+
+  .habit-details-state-action > button:last-child {
+    color: #f8f9fa;
   }
 }
 

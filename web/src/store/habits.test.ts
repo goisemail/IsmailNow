@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { getHabitStats, habitIsDueOnDate, useHabitsStore, type Habit, type HabitEntry } from './habits'
+import { getHabitDisplayState, getHabitStats, habitIsDueOnDate, nextBinaryHabitState, useHabitsStore, type Habit, type HabitEntry } from './habits'
 
 describe('habit persistence', () => {
   beforeEach(async () => {
@@ -106,6 +106,20 @@ describe('habit schedules and statistics', () => {
     expect(habitIsDueOnDate(habit, '2026-07-20')).toBe(true)
     expect(habitIsDueOnDate(habit, '2026-07-21')).toBe(false)
     expect(habitIsDueOnDate({ ...habit, endDate: '2026-07-22' }, '2026-07-24')).toBe(false)
+  })
+
+  it('derives a missing past scheduled date as missed', () => {
+    expect(getHabitDisplayState(habit, undefined, '2026-07-27', '2026-07-29')).toBe('missed')
+    expect(getHabitDisplayState(habit, undefined, '2026-07-28', '2026-07-29')).toBe('pending')
+    expect(getHabitDisplayState(habit, completed('2026-07-27'), '2026-07-27', '2026-07-29')).toBe('completed')
+  })
+
+  it('cycles binary states directly from green to yellow to red', () => {
+    expect(nextBinaryHabitState('pending')).toBe('completed')
+    expect(nextBinaryHabitState('completed')).toBe('skipped')
+    expect(nextBinaryHabitState('skipped')).toBe('failed')
+    expect(nextBinaryHabitState('failed')).toBe('completed')
+    expect(nextBinaryHabitState('missed')).toBe('completed')
   })
 
   it('derives missed days, completion rate, and streaks from the schedule', () => {

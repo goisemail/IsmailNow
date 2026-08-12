@@ -1,0 +1,58 @@
+.habit-state-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 2px solid #adb5bd;
+  border-radius: 50%;
+  color: #868e96;
+  background: #e9ecef;
+  cursor: pointer;
+  transition: transform 0.15s, background-color 0.15s, border-color 0.15s;
+}
+
+.habit-state-control:hover:not(:disabled) {
+  transform: scale(1.06);
+}
+
+.habit-state-control--completed {
+  border-color: #36b35f;
+  color: #ffffff;
+  background: #36b35f;
+}
+
+.habit-state-control--failed,
+.habit-state-control--missed {
+  border-color: #ff4358;
+  color: #ff4358;
+  background: rgba(255, 67, 88, 0.2);
+}
+
+.habit-state-control--inProgress {
+  border-color: #f9a825;
+  color: #f9a825;
+  background: rgba(249, 168, 37, 0.2);
+}
+
+.habit-state-control--skipped {
+  border-color: #f9a825;
+  color: #f9a825;
+  background: rgba(249, 168, 37, 0.2);
+}
+
+.habit-state-control:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@media (prefers-color-scheme: dark) {
+  .habit-state-control--pending {
+    color: #adb5bd;
+    background: #343a40;
+    border-color: #6c757d;
+  }
+
+}

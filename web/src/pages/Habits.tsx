@@ -1,16 +1,21 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
+  getHabitDisplayState,
   getHabitEntry,
   getHabitStats,
+  habitIsDueOnDate,
+  nextBinaryHabitState,
   todayLocal,
   useHabitsStore,
   type Habit,
+  type HabitDisplayState,
   type HabitEntry,
   type HabitStats,
 } from '../store/habits'
 import { BarChart3, Edit2, Plus, Trash2 } from 'lucide-react'
 import HabitWizard from '../components/HabitWizard'
+import HabitStateControl from '../components/HabitStateControl'
 import './Habits.css'
 
 export default function Habits() {
@@ -21,12 +26,14 @@ export default function Habits() {
   const addHabit = useHabitsStore((state) => state.addHabit)
   const deleteHabit = useHabitsStore((state) => state.deleteHabit)
   const logCompletion = useHabitsStore((state) => state.logCompletion)
+  const setEntryState = useHabitsStore((state) => state.setEntryState)
   const updateHabit = useHabitsStore((state) => state.updateHabit)
 
   const navigate = useNavigate()
 
   const [wizardOpen, setWizardOpen] = useState(false)
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null)
+  const today = todayLocal()
 
   const closeWizard = () => {
     setWizardOpen(false)
@@ -53,19 +60,28 @@ export default function Habits() {
         </div>
       ) : (
         <div className="habit-list">
-          {habits.map((habit) => (
-            <HabitRow
-              key={habit.id}
-              habit={habit}
-              entry={getHabitEntry(entries, habit.id, todayLocal())}
-              pendingSync={!habit.synced || pendingHabitIds.has(habit.id)}
-              stats={getHabitStats(habit, entries)}
-              onOpen={() => navigate(`/habit/${habit.id}`)}
-              onLog={() => logCompletion(habit.id)}
-              onEdit={() => { setEditingHabit(habit); setWizardOpen(true) }}
-              onDelete={() => deleteHabit(habit.id)}
-            />
-          ))}
+          {habits.map((habit) => {
+            const entry = getHabitEntry(entries, habit.id, today)
+            const displayState = getHabitDisplayState(habit, entry, today)
+            return (
+              <HabitRow
+                key={habit.id}
+                habit={habit}
+                entry={entry}
+                pendingSync={!habit.synced || pendingHabitIds.has(habit.id)}
+                displayState={displayState}
+                due={habitIsDueOnDate(habit, today)}
+                stats={getHabitStats(habit, entries)}
+                onOpen={() => navigate(`/habit/${habit.id}`)}
+                onState={() => {
+                  if (habit.evaluation.type === 'counter') logCompletion(habit.id, today)
+                  else setEntryState(habit.id, today, nextBinaryHabitState(displayState))
+                }}
+                onEdit={() => { setEditingHabit(habit); setWizardOpen(true) }}
+                onDelete={() => deleteHabit(habit.id)}
+              />
+            )
+          })}
         </div>
       )}
       <HabitWizard
@@ -86,14 +102,16 @@ interface HabitRowProps {
   habit: Habit
   entry?: HabitEntry
   pendingSync: boolean
+  displayState: HabitDisplayState
+  due: boolean
   stats: HabitStats
   onOpen: () => void
-  onLog: () => void
+  onState: () => void
   onEdit: () => void
   onDelete: () => void
 }
 
-function HabitRow({ habit, entry, pendingSync, stats, onOpen, onLog, onEdit, onDelete }: HabitRowProps) {
+function HabitRow({ habit, entry, pendingSync, displayState, due, stats, onOpen, onState, onEdit, onDelete }: HabitRowProps) {
   const target = habit.evaluation.type === 'binary' ? 1 : habit.evaluation.target
   const count = entry?.value ?? 0
   return (
@@ -128,16 +146,15 @@ function HabitRow({ habit, entry, pendingSync, stats, onOpen, onLog, onEdit, onD
         </div>
       </div>
       <div className="habit-row-actions">
-        <button
-          className={`habit-counter-action${entry?.state === 'completed' ? ' done' : ''}`}
-          style={{ '--habit-color': habit.color } as React.CSSProperties}
-          onClick={(event) => { event.stopPropagation(); onLog() }}
-          title="Add one to the counter"
-          aria-label={`Log ${habit.name}`}
-          data-testid={`habit-log-${habit.id}`}
-        >
-          {entry?.state === 'completed' ? '✓' : '+'}
-        </button>
+        <span onClick={(event) => event.stopPropagation()}>
+          <HabitStateControl
+            state={displayState}
+            onClick={onState}
+            disabled={!due}
+            label={due ? `Set state for ${habit.name}` : `${habit.name} is not scheduled today`}
+            testId={`habit-log-${habit.id}`}
+          />
+        </span>
         <button className="habit-action-btn" onClick={(event) => { event.stopPropagation(); onEdit() }} title="Edit" data-testid={`habit-edit-${habit.id}`}>
           <Edit2 size={15} />
         </button>
