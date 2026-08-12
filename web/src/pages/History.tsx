@@ -1,5 +1,13 @@
 import { useState, useMemo } from 'react'
-import { getHabitStats, useHabitsStore } from '../store/habits'
+import {
+  getHabitDisplayState,
+  getHabitEntry,
+  getHabitStats,
+  habitIsDueOnDate,
+  todayLocal,
+  useHabitsStore,
+  type HabitDisplayState,
+} from '../store/habits'
 import { useTasksStore } from '../store/tasks'
 import { Calendar as BigCalendar, dateFnsLocalizer, type View } from 'react-big-calendar'
 import format from 'date-fns/format'
@@ -13,12 +21,35 @@ import './History.css'
 const locales = { 'en-US': enUS }
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales })
 
+interface CalendarEvent {
+  title: string
+  start: Date
+  end: Date
+  id: string
+  color?: string
+}
+
+const HABIT_STATE_META: Record<Exclude<HabitDisplayState, 'pending'>, { label: string; symbol: string; color: string }> = {
+  completed: { label: 'Done', symbol: '✓', color: '#36b35f' },
+  failed: { label: 'Failed', symbol: '×', color: '#ff4358' },
+  missed: { label: 'Missed', symbol: '×', color: '#ff4358' },
+  inProgress: { label: 'In progress', symbol: '...', color: '#f9a825' },
+  skipped: { label: 'Skipped', symbol: '-', color: '#f9a825' },
+}
+
+function nextDate(date: string): string {
+  const value = new Date(`${date}T12:00:00`)
+  value.setDate(value.getDate() + 1)
+  return value.toISOString().slice(0, 10)
+}
+
 export default function History() {
   const storedHabits = useHabitsStore((state) => state.habits)
   const habits = storedHabits.filter((habit) => !habit.isDeleted)
   const entries = useHabitsStore((state) => state.entries)
   const tasks = useTasksStore((state) => state.tasks)
   const [calendarMode, setCalendarMode] = useState<'day' | 'week' | 'month'>('month')
+  const today = todayLocal()
 
   const calendarEvents = useMemo(
     () => {
@@ -31,18 +62,34 @@ export default function History() {
         end.setHours(start.getHours() + 1)
         return { title: task.title, start, end, id: `task:${task.id}` }
       })
-      const habitsById = new Map(habits.map((habit) => [habit.id, habit]))
-      const habitEvents = entries
-        .filter((entry) => entry.state === 'completed' && !entry.isDeleted && habitsById.has(entry.habitId))
-        .map((entry) => {
-          const start = new Date(`${entry.date}T18:00:00`)
-          const end = new Date(start)
-          end.setMinutes(end.getMinutes() + 30)
-          return { title: `✓ ${habitsById.get(entry.habitId)?.name}`, start, end, id: `habit:${entry.id}` }
-        })
+      const habitEvents: CalendarEvent[] = habits.flatMap((habit) => {
+        const events: CalendarEvent[] = []
+        let date = habit.startDate
+        for (let checked = 0; checked < 36_525 && date <= today; checked += 1) {
+          if (habitIsDueOnDate(habit, date)) {
+            const entry = getHabitEntry(entries, habit.id, date)
+            const state = getHabitDisplayState(habit, entry, date, today)
+            if (state !== 'pending') {
+              const meta = HABIT_STATE_META[state]
+              const start = new Date(`${date}T18:00:00`)
+              const end = new Date(start)
+              end.setMinutes(end.getMinutes() + 30)
+              events.push({
+                title: `${meta.symbol} ${habit.name} (${meta.label})`,
+                start,
+                end,
+                id: `habit:${habit.id}:${date}`,
+                color: meta.color,
+              })
+            }
+          }
+          date = nextDate(date)
+        }
+        return events
+      })
       return [...taskEvents, ...habitEvents]
     },
-    [entries, habits, tasks],
+    [entries, habits, tasks, today],
   )
   const topHabit = habits
     .map((habit) => ({ habit, streak: getHabitStats(habit, entries).bestStreak }))
@@ -81,7 +128,7 @@ export default function History() {
       {/* Calendar fills remaining space */}
       <div className="history-calendar-wrap">
         <div className="card">
-          <BigCalendar
+          <BigCalendar<CalendarEvent>
             localizer={localizer}
             events={calendarEvents}
             startAccessor="start"
@@ -93,6 +140,9 @@ export default function History() {
             onView={(view: View) => {
               if (view === 'day' || view === 'week' || view === 'month') setCalendarMode(view)
             }}
+            eventPropGetter={(event) => ({
+              style: event.color ? { backgroundColor: event.color, borderColor: event.color } : undefined,
+            })}
           />
         </div>
       </div>

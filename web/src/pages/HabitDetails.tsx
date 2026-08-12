@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { getHabitEntry, getHabitStats, todayLocal, useHabitsStore } from '../store/habits'
+import { getHabitDisplayState, getHabitEntry, getHabitStats, habitIsDueOnDate, nextBinaryHabitState, todayLocal, useHabitsStore } from '../store/habits'
 import { ArrowLeft, Edit2 } from 'lucide-react'
 import HabitWizard from '../components/HabitWizard'
+import HabitStateControl from '../components/HabitStateControl'
 import './HabitDetails.css'
 
 export default function HabitDetails() {
@@ -12,6 +13,7 @@ export default function HabitDetails() {
   const entries = useHabitsStore((state) => state.entries)
   const logCompletion = useHabitsStore((state) => state.logCompletion)
   const updateHabit = useHabitsStore((state) => state.updateHabit)
+  const setEntryState = useHabitsStore((state) => state.setEntryState)
   const [editOpen, setEditOpen] = useState(false)
 
   const habit = habits.find((h) => h.id === id && !h.isDeleted)
@@ -35,11 +37,17 @@ export default function HabitDetails() {
   const stats = getHabitStats(habit, entries)
   const target = habit.evaluation.type === 'binary' ? 1 : habit.evaluation.target
   const count = entry?.value ?? 0
+  const displayState = getHabitDisplayState(habit, entry, today)
+  const dueToday = habitIsDueOnDate(habit, today)
   const segmentCount = Math.min(Math.max(Math.round(target), 1), 20)
   const filledSegments = Math.round(Math.min(1, count / target) * segmentCount)
   const lastLogged = entries
     .filter((candidate) => candidate.habitId === habit.id && !candidate.isDeleted)
     .sort((a, b) => b.date.localeCompare(a.date))[0]?.date
+  const advanceState = () => {
+    if (habit.evaluation.type === 'counter') logCompletion(habit.id, today)
+    else setEntryState(habit.id, today, nextBinaryHabitState(displayState))
+  }
 
   return (
     <div className="habit-details container-lg py-4">
@@ -77,14 +85,19 @@ export default function HabitDetails() {
           ))}
         </div>
 
-        <button
-          className="habit-stat-log-btn"
-          style={{ backgroundColor: habit.color }}
-          onClick={() => logCompletion(habit.id, today)}
-          data-testid="logCompletionBtn"
-        >
-          {entry?.state === 'completed' ? 'Completed ✓' : `Record progress (${count}/${target})`}
-        </button>
+        <div className="habit-details-state-action">
+          <HabitStateControl
+            state={displayState}
+            onClick={advanceState}
+            disabled={!dueToday}
+            label={dueToday ? `Set state for ${habit.name}` : `${habit.name} is not scheduled today`}
+            testId="logCompletionBtn"
+          />
+          <button type="button" onClick={advanceState} disabled={!dueToday}>
+            <strong>{displayState === 'missed' ? 'Missed' : displayState}</strong>
+            <span>{habit.evaluation.type === 'counter' ? `${count}/${target}` : 'Change daily state'}</span>
+          </button>
+        </div>
       </section>
       <HabitWizard
         open={editOpen}

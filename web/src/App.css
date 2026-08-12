@@ -341,7 +341,8 @@ body {
     grid-template-columns: repeat(2, 31px);
   }
 
-  .habit-row-actions .habit-counter-action {
+  .habit-row-actions .habit-counter-action,
+  .habit-row-actions > span {
     grid-row: span 2;
     align-self: center;
   }

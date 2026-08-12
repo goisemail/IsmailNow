@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { accountStorageKey } from '../lib/accountStorage'
 
 export type HabitEntryState = 'completed' | 'failed' | 'inProgress' | 'skipped'
+export type HabitDisplayState = HabitEntryState | 'pending' | 'missed'
 
 export type HabitEvaluation =
   | { type: 'binary' }
@@ -208,6 +209,22 @@ export function habitIsDueOnDate(habit: Habit, date: string): boolean {
 
 export function getHabitEntry(entries: HabitEntry[], habitId: string, date: string): HabitEntry | undefined {
   return entries.find((entry) => entry.habitId === habitId && entry.date === date && !entry.isDeleted)
+}
+
+export function getHabitDisplayState(
+  habit: Habit,
+  entry: HabitEntry | undefined,
+  date: string,
+  today = todayLocal(),
+): HabitDisplayState {
+  if (entry) return entry.state
+  return habitIsDueOnDate(habit, date) && date < today ? 'missed' : 'pending'
+}
+
+export function nextBinaryHabitState(state: HabitDisplayState): HabitEntryState {
+  if (state === 'completed') return 'skipped'
+  if (state === 'skipped' || state === 'inProgress') return 'failed'
+  return 'completed'
 }
 
 function previousDate(date: string): string {

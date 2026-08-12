@@ -1,10 +1,13 @@
 import { useState, type Dispatch, type SetStateAction } from 'react'
 import {
+  getHabitDisplayState,
   getHabitEntry,
   habitIsDueOnDate,
+  nextBinaryHabitState,
   todayLocal,
   useHabitsStore,
   type Habit,
+  type HabitDisplayState,
   type HabitEntry,
 } from '../store/habits'
 import { useTasksStore, taskVisibleOnDate } from '../store/tasks'
@@ -13,6 +16,7 @@ import './Dashboard.css'
 import QuickAddSheet from '../components/QuickAddSheet'
 import HabitWizard from '../components/HabitWizard'
 import TaskWizard from '../components/TaskWizard'
+import HabitStateControl from '../components/HabitStateControl'
 import { getContrastingAccentColor } from '../utils/color'
 
 interface WeekDay {
@@ -101,6 +105,7 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
   const habits = storedHabits.filter((habit) => habitIsDueOnDate(habit, selectedDate))
   const pendingHabitIds = new Set(entries.filter((entry) => !entry.synced).map((entry) => entry.habitId))
   const logCompletion = useHabitsStore((state) => state.logCompletion)
+  const setEntryState = useHabitsStore((state) => state.setEntryState)
   const addHabit = useHabitsStore((state) => state.addHabit)
 
   const tasks = useTasksStore((state) => state.tasks)
@@ -155,16 +160,24 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
           </div>
         ) : (
           <div className="habit-list">
-            {habits.map((habit) => (
-              <HabitCard
-                key={habit.id}
-                habit={habit}
-                entry={getHabitEntry(entries, habit.id, selectedDate)}
-                pendingSync={!habit.synced || pendingHabitIds.has(habit.id)}
-                locked={selectedDate > todayLocal()}
-                onComplete={() => logCompletion(habit.id, selectedDate)}
-              />
-            ))}
+            {habits.map((habit) => {
+              const entry = getHabitEntry(entries, habit.id, selectedDate)
+              const displayState = getHabitDisplayState(habit, entry, selectedDate)
+              return (
+                <HabitCard
+                  key={habit.id}
+                  habit={habit}
+                  entry={entry}
+                  pendingSync={!habit.synced || pendingHabitIds.has(habit.id)}
+                  displayState={displayState}
+                  locked={selectedDate > todayLocal()}
+                  onAdvance={() => {
+                    if (habit.evaluation.type === 'counter') logCompletion(habit.id, selectedDate)
+                    else setEntryState(habit.id, selectedDate, nextBinaryHabitState(displayState))
+                  }}
+                />
+              )
+            })}
           </div>
         )}
       </div>
@@ -253,14 +266,14 @@ interface HabitCardProps {
   habit: Habit
   entry?: HabitEntry
   pendingSync: boolean
+  displayState: HabitDisplayState
   locked: boolean
-  onComplete: () => void
+  onAdvance: () => void
 }
 
-function HabitCard({ habit, entry, pendingSync, locked, onComplete }: HabitCardProps) {
+function HabitCard({ habit, entry, pendingSync, displayState, locked, onAdvance }: HabitCardProps) {
   const target = habit.evaluation.type === 'binary' ? 1 : habit.evaluation.target
   const count = entry?.value ?? 0
-  const isComplete = entry?.state === 'completed'
   return (
     <div className="habit-home-row" data-testid={'habitCard-' + habit.id}>
       <span className="habit-color-bar" style={{ backgroundColor: habit.color }} aria-hidden="true" />
@@ -271,19 +284,16 @@ function HabitCard({ habit, entry, pendingSync, locked, onComplete }: HabitCardP
         </span>
         <span className="habit-home-meta">
           <strong>{count}/{target}</strong>
-          <span>{entry?.state ?? 'pending'}</span>
+          <span>{displayState}</span>
         </span>
       </div>
-      <button
-        className={`task-toggle${isComplete ? ' done' : ''}`}
-        onClick={onComplete}
+      <HabitStateControl
+        state={displayState}
+        onClick={onAdvance}
         disabled={locked}
-        aria-label={`Log ${habit.name}`}
-        title={locked ? 'Future habits are locked' : (isComplete ? 'Habit complete' : 'Record progress')}
-        data-testid={'habitLog-' + habit.id}
-      >
-        {isComplete && '✓'}
-      </button>
+        label={locked ? 'Future habits are locked' : `Set state for ${habit.name}`}
+        testId={'habitLog-' + habit.id}
+      />
     </div>
   )
 }
