@@ -21,6 +21,8 @@ Docs (links reference within this repo)
 - Glossary: `glossary.md`
 - Summary memory: `summary-2026-03-11.md`
 - Summary memory (full): `summary-2026-03-11.md` (redundant memory artifact)
+- Habit feature upgrades: `HABIT_FEATURE_UPGRADES.md`
+- Plan the day (scheduling) feature analysis: `DAY_PLANNING_FEATURE.md`
 
 Cross-references
 - Every major doc should reference `plan-2026-03-11.md` as the canonical source of truth.
