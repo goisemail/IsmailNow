@@ -3,7 +3,20 @@
 }
 
 .habits-page .habit-list {
-  margin-bottom: 5rem;
+  margin-bottom: 0;
+}
+
+.habits-page > section:last-of-type {
+  margin-bottom: 5rem !important;
+}
+
+.habit-finished-badge {
+  padding: 0.25rem 0.55rem;
+  border-radius: 999px;
+  color: #495057;
+  background: #e9ecef;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 @media (max-width: 576px) {

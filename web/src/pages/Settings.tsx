@@ -4,9 +4,11 @@ import { useTasksStore } from '../store/tasks'
 import { useAuth } from '../contexts/AuthContext'
 import { Trash2 } from 'lucide-react'
 import { listDriveBackups, type DriveBackup } from '../lib/googleDrive'
+import { buildBackupJson } from '../lib/backup'
 
 export default function Settings() {
   const allHabits = useHabitsStore((state) => state.habits)
+  const habitEntries = useHabitsStore((state) => state.entries)
   const habits = allHabits.filter((habit) => !habit.isDeleted)
   const deleteHabit = useHabitsStore((state) => state.deleteHabit)
   const tasks = useTasksStore((state) => state.tasks)
@@ -27,12 +29,7 @@ export default function Settings() {
   }, [canSync, getAccessToken, hasUsableAccessToken, reauthRequired])
 
   const handleExport = () => {
-    const data = {
-      habits: allHabits,
-      tasks,
-      exportDate: new Date().toISOString(),
-    }
-    const json = JSON.stringify(data, null, 2)
+    const json = buildBackupJson(allHabits, habitEntries, tasks)
     const blob = new Blob([json], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')

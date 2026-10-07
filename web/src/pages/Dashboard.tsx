@@ -38,8 +38,7 @@ interface WeekNavigatorProps {
 }
 
 function getWeekDays(weekOffset: number): WeekDay[] {
-  const now = new Date()
-  const todayKey = now.toISOString().slice(0, 10)
+  const todayKey = todayLocal()
   const [yr, mo, dy] = todayKey.split('-').map(Number)
   const todayMs = Date.UTC(yr, mo - 1, dy)
   const dow = new Date(todayMs).getUTCDay()
