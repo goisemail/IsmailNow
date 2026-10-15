@@ -1,0 +1,100 @@
+.planner-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin-bottom: 8px;
+}
+
+.planner-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.planner-toolbar-today {
+  color: var(--planner-text);
+  background: transparent;
+  border: 1px solid var(--planner-border);
+  border-radius: 999px;
+  padding: 6px 16px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+}
+
+.planner-toolbar-today:hover {
+  color: var(--planner-text);
+  background: var(--planner-surface-alt);
+  border-color: var(--planner-text-dim);
+}
+
+.planner-toolbar-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.planner-toolbar-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  color: var(--planner-text);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.planner-toolbar-nav-btn:hover {
+  background: var(--planner-surface-alt);
+}
+
+.planner-toolbar-label {
+  margin-left: 4px;
+  color: var(--planner-text);
+  font-size: 1rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.planner-toolbar-views {
+  display: flex;
+  align-items: center;
+}
+
+.planner-toolbar-view-btn {
+  color: var(--planner-text);
+  background: var(--planner-surface-alt);
+  border: 1px solid var(--planner-border);
+  padding: 6px 14px;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.planner-toolbar-view-btn + .planner-toolbar-view-btn {
+  margin-left: -1px;
+}
+
+.planner-toolbar-view-btn:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.planner-toolbar-view-btn:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.planner-toolbar-view-btn:hover {
+  background: var(--planner-border);
+}
+
+.planner-toolbar-view-btn.active {
+  color: #ffffff;
+  background: var(--planner-accent);
+  border-color: var(--planner-accent);
+}

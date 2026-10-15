@@ -69,39 +69,6 @@
   min-height: 0;
 }
 
-/* ─── react-big-calendar: toolbar ─── */
-.planner-calendar-wrap .rbc-toolbar {
-  flex-wrap: wrap;
-  gap: 4px;
-  margin-bottom: 8px;
-}
-
-.planner-calendar-wrap .rbc-toolbar-label {
-  color: var(--planner-text);
-  font-weight: 600;
-}
-
-.planner-calendar-wrap .rbc-btn-group > button {
-  color: var(--planner-text);
-  background: var(--planner-surface-alt);
-  border: 1px solid var(--planner-border);
-  border-radius: 6px;
-}
-
-.planner-calendar-wrap .rbc-btn-group > button:hover,
-.planner-calendar-wrap .rbc-btn-group > button:focus {
-  color: var(--planner-text);
-  background: var(--planner-border);
-  border-color: var(--planner-text-dim);
-}
-
-.planner-calendar-wrap .rbc-btn-group > button.rbc-active,
-.planner-calendar-wrap .rbc-btn-group > button:active {
-  color: #ffffff;
-  background: var(--planner-accent);
-  border-color: var(--planner-accent);
-}
-
 /* ─── react-big-calendar: grid surfaces ─── */
 .planner-calendar-wrap .rbc-month-view,
 .planner-calendar-wrap .rbc-time-view,

@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useTasksStore } from '../store/tasks'
 import { Calendar as BigCalendar, dateFnsLocalizer } from 'react-big-calendar'
+import PlannerToolbar from '../components/PlannerToolbar'
 import format from 'date-fns/format'
 import parse from 'date-fns/parse'
 import startOfWeek from 'date-fns/startOfWeek'
@@ -45,6 +46,7 @@ export default function Planner() {
             endAccessor="end"
             style={{ height: '100%' }}
             views={['day', 'week', 'month']}
+            components={{ toolbar: PlannerToolbar }}
             view={plannerMode}
             onView={(v: any) => setPlannerMode(v as any)}
           />

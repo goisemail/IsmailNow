@@ -19,7 +19,7 @@
   - Explicit button group in planner header (`Planner.tsx`)
   - react-big-calendar renders its own view toolbar at calendar top
   - Both show Day/Week/Month = duplicate UI, wastes vertical space
-- **Fix (user decision)**: Keep the react-big-calendar toolbar (it also carries Today / Back / Next nav + the date label). **Removed the header button group** — the calendar toolbar is the single Day/Week/Month switcher. No `toolbar={false}` needed.
+- **Fix (user decision)**: Keep one toolbar only — removed the header button group and replaced the RBC default toolbar with a custom `PlannerToolbar` (`components={{ toolbar }}`) in the reference style: `[Today] pill | < > adjacent chevrons | date label ......... [Day][Week][Month]`. Label stays contextual per view (single date in Day, range in Week, month in Month).
 
 ### 3. No View Switcher After Toolbar Removal (gap in old plan) — RESOLVED
 - **Problem**: The old plan removed the header button group AND set `toolbar={false}`, leaving the user with no way to switch Day/Week/Month.
@@ -63,10 +63,10 @@ The + button opens a modal with these fields:
 
 ## Development Plan
 
-### Phase 1: Planner.tsx — DONE (steps 2)
-1. ~~Set `toolbar={false}` on `BigCalendar`~~ — not needed; RBC toolbar is the kept switcher
-2. ~~Build custom planner header~~ — not needed (RBC toolbar has nav + views)
-3. Removed the old header `btn-group` and the redundant `defaultView` prop
+### Phase 1: Planner.tsx
+1. ~~Set `toolbar={false}` on `BigCalendar`~~ — not needed
+2. ~~Build custom planner header~~ — removed header button group; toolbar consolidated into one
+3. Added custom `components/PlannerToolbar.tsx`: `Today` outline pill + adjacent `ChevronLeft`/`ChevronRight` (lucide-react) + contextual date label on the left, `Day/Week/Month` segmented control right-aligned; removed the redundant `defaultView` prop
 4. Replace fake-time event mapping: real start/end from stored times, keyed per day
 5. Expand repeating tasks across their date range (`eachDayOfInterval`)
 6. Attach `task.backgroundColor` and completed styling to events
