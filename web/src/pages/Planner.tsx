@@ -34,32 +34,6 @@ export default function Planner() {
     <div className="planner-page">
       <div className="planner-header">
         <h1 className="h3 mb-0">Planner</h1>
-        <div className="btn-group" role="group" aria-label="Planner view">
-          <button
-            type="button"
-            className={`btn btn-sm ${plannerMode === 'day' ? 'btn-primary' : 'btn-outline-secondary'}`}
-            onClick={() => setPlannerMode('day')}
-            data-testid="planner-day"
-          >
-            Day
-          </button>
-          <button
-            type="button"
-            className={`btn btn-sm ${plannerMode === 'week' ? 'btn-primary' : 'btn-outline-secondary'}`}
-            onClick={() => setPlannerMode('week')}
-            data-testid="planner-week"
-          >
-            Week
-          </button>
-          <button
-            type="button"
-            className={`btn btn-sm ${plannerMode === 'month' ? 'btn-primary' : 'btn-outline-secondary'}`}
-            onClick={() => setPlannerMode('month')}
-            data-testid="planner-month"
-          >
-            Month
-          </button>
-        </div>
       </div>
 
       <div className="planner-calendar-wrap">
@@ -71,7 +45,6 @@ export default function Planner() {
             endAccessor="end"
             style={{ height: '100%' }}
             views={['day', 'week', 'month']}
-            defaultView={plannerMode}
             view={plannerMode}
             onView={(v: any) => setPlannerMode(v as any)}
           />
