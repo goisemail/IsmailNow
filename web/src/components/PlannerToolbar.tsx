@@ -39,7 +39,7 @@ export default function PlannerToolbar({
         >
           Today
         </button>
-        <div className="planner-toolbar-nav">
+        <div className="planner-toolbar-date-nav">
           <button
             type="button"
             className="planner-toolbar-nav-btn"
@@ -49,6 +49,7 @@ export default function PlannerToolbar({
           >
             <ChevronLeft size={20} />
           </button>
+          <span className="planner-toolbar-label">{label}</span>
           <button
             type="button"
             className="planner-toolbar-nav-btn"
@@ -59,7 +60,6 @@ export default function PlannerToolbar({
             <ChevronRight size={20} />
           </button>
         </div>
-        <span className="planner-toolbar-label">{label}</span>
       </div>
 
       <div className="planner-toolbar-views" role="group" aria-label="Planner view">

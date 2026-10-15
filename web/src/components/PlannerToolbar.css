@@ -31,10 +31,10 @@
   border-color: var(--planner-text-dim);
 }
 
-.planner-toolbar-nav {
+.planner-toolbar-date-nav {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 6px;
 }
 
 .planner-toolbar-nav-btn {
@@ -55,7 +55,6 @@
 }
 
 .planner-toolbar-label {
-  margin-left: 4px;
   color: var(--planner-text);
   font-size: 1rem;
   font-weight: 600;
