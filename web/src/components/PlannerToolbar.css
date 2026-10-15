@@ -1,9 +1,8 @@
 .planner-toolbar {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 10px 16px;
+  gap: 8px 16px;
   margin-bottom: 8px;
 }
 
@@ -11,6 +10,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  justify-self: start;
 }
 
 .planner-toolbar-today {
@@ -61,39 +61,72 @@
   white-space: nowrap;
 }
 
-.planner-toolbar-views {
-  display: flex;
-  align-items: center;
+@media (max-width: 576px) {
+  .planner-toolbar {
+    gap: 8px;
+  }
+
+  .planner-toolbar-label {
+    font-size: 0.9375rem;
+  }
+}
+
+.planner-toolbar-view {
+  position: relative;
+  justify-self: end;
 }
 
 .planner-toolbar-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--planner-text);
   background: var(--planner-surface-alt);
   border: 1px solid var(--planner-border);
+  border-radius: 999px;
   padding: 6px 14px;
   font-size: 0.875rem;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
-}
-
-.planner-toolbar-view-btn + .planner-toolbar-view-btn {
-  margin-left: -1px;
-}
-
-.planner-toolbar-view-btn:first-child {
-  border-radius: 6px 0 0 6px;
-}
-
-.planner-toolbar-view-btn:last-child {
-  border-radius: 0 6px 6px 0;
+  transition: border-color 0.2s;
 }
 
 .planner-toolbar-view-btn:hover {
+  border-color: var(--planner-text-dim);
+}
+
+.planner-toolbar-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  min-width: 140px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  background: var(--planner-surface-alt);
+  border: 1px solid var(--planner-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.planner-toolbar-dropdown-item {
+  color: var(--planner-text);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.planner-toolbar-dropdown-item:hover {
   background: var(--planner-border);
 }
 
-.planner-toolbar-view-btn.active {
+.planner-toolbar-dropdown-item.active {
   color: #ffffff;
   background: var(--planner-accent);
-  border-color: var(--planner-accent);
 }

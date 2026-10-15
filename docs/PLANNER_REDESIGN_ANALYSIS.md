@@ -19,7 +19,7 @@
   - Explicit button group in planner header (`Planner.tsx`)
   - react-big-calendar renders its own view toolbar at calendar top
   - Both show Day/Week/Month = duplicate UI, wastes vertical space
-- **Fix (user decision)**: Keep one toolbar only — removed the header button group and replaced the RBC default toolbar with a custom `PlannerToolbar` (`components={{ toolbar }}`) in the reference style: `[Today] pill | < date label > ......... [Day][Week][Month]`. Label stays contextual per view (single date in Day, range in Week, month in Month).
+- **Fix (user decision)**: Keep one toolbar only — removed the header button group and replaced the RBC default toolbar with a custom `PlannerToolbar` (`components={{ toolbar }}`) in the reference style: `[Today] pill | < date label >` on the left, view selector dropdown (`Day ▾` pill opening a Day/Week/Month menu) on the right. Label stays contextual per view (single date in Day, range in Week, month in Month).
 
 ### 3. No View Switcher After Toolbar Removal (gap in old plan) — RESOLVED
 - **Problem**: The old plan removed the header button group AND set `toolbar={false}`, leaving the user with no way to switch Day/Week/Month.
