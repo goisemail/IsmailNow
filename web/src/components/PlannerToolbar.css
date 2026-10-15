@@ -89,6 +89,8 @@
   font-weight: 600;
   cursor: pointer;
   transition: border-color 0.2s;
+  margin-right: -2px;
+  margin-left: -18px;
 }
 
 .planner-toolbar-view-btn:hover {
