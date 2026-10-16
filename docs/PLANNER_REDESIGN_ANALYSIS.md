@@ -49,11 +49,12 @@ The + button opens **PlanWizard** with these fields:
 1. Save → the plan is created immediately (always; checkboxes optional — a plan can exist alone)
 2. If **Task** checked → **one task is created per plan occurrence** (same title, each dated to its occurrence day — creation day included only if its weekday is selected) and their ids are stored in `plan.linkedTaskIds` — no wizard, since TaskWizard only collected the name the plan already has
 3. If **Habit** checked → `HabitWizard` opens (it configures colour/evaluation/frequency/priority that cannot be inferred) → save calls `addHabit(draft)`
-4. When both are checked: task created instantly, then the habit wizard is the only modal
-5. Cancelling the habit wizard keeps the plan and the already-created task, and skips the habit link
-6. Plan edit/delete deferred to a later step
+4. When both are checked: tasks created instantly for every occurrence, then the habit wizard is the only modal
+5. Cancelling the habit wizard keeps the plan and the already-created tasks, and skips the habit link
 
-Hint labels under the checkboxes make the difference discoverable ("Created instantly in the Tasks tab…" / "Opens the habit setup wizard…").
+**Task visibility** — matches the Home tab: `taskVisibleOnDate(task, date)` — a task shows **from its startDate onward** until completed; an uncompleted pending task piles up day by day. In the Tasks tab, pending tasks are filtered this way, so a planned task dated Oct 16 stays hidden until Oct 16, and if left uncompleted it shows on Oct 17, 19, 23, 26, 30… alongside later-occurring tasks.
+
+**Hint labels** under the checkboxes make the difference discoverable ("Created instantly in the Tasks tab…" / "Opens the habit setup wizard…").
 
 **Repeat nuances (implemented):**
 - All 7 circles selected by default = daily repeat; empty selection falls back to daily
@@ -67,7 +68,7 @@ Hint labels under the checkboxes make the difference discoverable ("Created inst
 
 ### 7. No Recurrence Expansion — DONE (step 4, weekdays added later)
 - **Problem**: react-big-calendar has no recurrence. A repeating plan (repeat end date) exists as a single record but must appear on every day in its range.
-- **Fix**: Expand repeating plans into per-day events using date-fns (`eachDayOfInterval` between `startDate` and `endDate`) via `planOccurrenceDates`. With `repeatDays` set, only matching weekdays occur (plus the plan's own day). Lives in `utils/planner.ts` with unit tests.
+- **Fix**: Expand repeating plans into per-day events using date-fns (`eachDayOfInterval` between `startDate` and `endDate`) via `planOccurrenceDates`. With `repeatDays` set, only matching weekdays occur (creation day included only if its weekday is selected). Lives in `utils/planner.ts` with unit tests.
 
 ### 8. Events Ignore Plan Styling and State — DONE (step 4)
 - **Problem**: Events render plain; plans have no distinct color/state, and linked vs standalone plans are indistinguishable.
@@ -137,7 +138,7 @@ Implemented: `store/plans.test.ts` (persist/relay/link/merge), `components/PlanW
 - [x] Plan appears at its real time on the calendar
 - [x] Repeating plan appears on every day through its end date
 - [x] Weekday repeat: all 7 circles default-selected; picking only Sat/Sun allocates time only on those days
-- [x] Task checkbox → one task per planned occurrence, visible in Tasks tab and Home (instant, no wizard)
+- [x] Task checkbox → one task per planned occurrence, visible in Tasks tab and Home (instant, no wizard); pending tasks show from their startDate onward and pile up day by day until completed
 - [x] Habit checkbox → habit created, visible in Habits tab and Home
 - [x] Both checkboxes → task created instantly, habit wizard follows; cancel keeps plan + task
 - [x] Plans survive reload and Drive sync on a second device (schema v4 with plan parse/canonical coverage)
