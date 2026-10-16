@@ -13,6 +13,7 @@ import {
 } from './googleDrive'
 import type { PendingTask } from '../store/tasks'
 import type { Habit, HabitEntry } from '../store/habits'
+import type { PendingPlan } from '../store/plans'
 
 const getToken: TokenProvider = vi.fn(async () => 'token')
 
@@ -68,6 +69,55 @@ describe('Drive document parsing', () => {
 
     expect(parsed.habits).toMatchObject([{ id: 'habit-1', name: 'Read', synced: true }])
     expect(parsed.habitEntries).toEqual([])
+    expect(parsed.plans).toEqual([])
+  })
+
+  it('round-trips a repeating plan with all fields', () => {
+    const parsed = parseSyncDocument(JSON.stringify({
+      schemaVersion: 4,
+      updatedAt: '2026-07-29T00:00:00.000Z',
+      tasks: [],
+      habits: [],
+      habitEntries: [],
+      plans: [{
+        id: 'plan-1',
+        title: 'Deep work',
+        startDate: '2026-07-28',
+        startTime: '09:00',
+        endTime: '11:00',
+        endDate: '2026-08-04',
+        isRepeating: true,
+        linkedTaskId: 'task-9',
+        linkedHabitId: null,
+        createdAt: '2026-07-28T00:00:00.000Z',
+        updatedAt: '2026-07-28T00:00:00.000Z',
+      }],
+    }))
+
+    expect(parsed.plans).toMatchObject([{
+      id: 'plan-1',
+      title: 'Deep work',
+      startDate: '2026-07-28',
+      startTime: '09:00',
+      endTime: '11:00',
+      endDate: '2026-08-04',
+      isRepeating: true,
+      linkedTaskId: 'task-9',
+      linkedHabitId: null,
+      synced: true,
+    }])
+  })
+
+  it('does not silently drop malformed plans', () => {
+    const content = JSON.stringify({
+      schemaVersion: 4,
+      tasks: [],
+      habits: [],
+      habitEntries: [],
+      plans: [{ id: 'broken', title: 'No times' }],
+    })
+
+    expect(() => parseSyncDocument(content)).toThrow(DriveDataError)
   })
 })
 
@@ -99,10 +149,11 @@ describe('Drive repository', () => {
     expect(fetchMock.mock.calls[2][0]).toContain('uploadType=media')
     expect(fetchMock.mock.calls[2][1]).toMatchObject({ method: 'PATCH' })
     expect(JSON.parse(String(fetchMock.mock.calls[2][1]?.body))).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       tasks: [],
       habits: [],
       habitEntries: [],
+      plans: [],
     })
     expect(fetchMock.mock.calls[1][1]?.body).not.toBeInstanceOf(FormData)
   })
@@ -204,15 +255,30 @@ describe('Drive repository', () => {
       updatedAt: '2026-07-28T12:00:00.000Z',
       synced: true,
     }
+    const plan: PendingPlan = {
+      id: 'plan-1',
+      title: 'Deep work',
+      startDate: '2026-07-28',
+      startTime: '09:00',
+      endTime: '11:00',
+      endDate: null,
+      isRepeating: false,
+      linkedTaskId: 'task-1',
+      linkedHabitId: null,
+      createdAt: '2026-07-28T00:00:00.000Z',
+      updatedAt: '2026-07-28T00:00:00.000Z',
+      synced: true,
+    }
     const fetchMock = vi.mocked(fetch)
     fetchMock
       .mockResolvedValueOnce(jsonResponse({ id: 'file-1', version: '1' }, 200, { ETag: 'one' }))
       .mockResolvedValueOnce(jsonResponse({ id: 'file-1', version: '2' }))
       .mockResolvedValueOnce(new Response(JSON.stringify({
-        schemaVersion: 3,
+        schemaVersion: 4,
         tasks: [{ ...task, synced: undefined }],
         habits: [{ ...habit, synced: undefined }],
         habitEntries: [{ ...habitEntry, synced: undefined }],
+        plans: [{ ...plan, synced: undefined }],
       }), { status: 200 }))
       .mockResolvedValueOnce(jsonResponse({ id: 'file-1', version: '3' }))
 
@@ -222,13 +288,15 @@ describe('Drive repository', () => {
       { id: 'file-1', version: '1' },
       [habit],
       [habitEntry],
+      [plan],
     ))
       .resolves.toMatchObject({ version: '2' })
     expect(fetchMock.mock.calls[1][1]?.headers).toMatchObject({ 'If-Match': 'one' })
     expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       habits: [{ id: 'habit-1', name: 'Read' }],
       habitEntries: [{ id: 'habit-1:2026-07-28', state: 'completed' }],
+      plans: [{ id: 'plan-1', title: 'Deep work', startTime: '09:00', linkedTaskId: 'task-1' }],
     })
   })
 })

@@ -11,9 +11,11 @@ const mocks = vi.hoisted(() => ({
   },
   pendingTasks: true,
   pendingHabits: false,
+  pendingPlans: false,
   tasks: [] as unknown[],
   habits: [] as unknown[],
   entries: [] as unknown[],
+  plans: [] as unknown[],
   online: true,
 }))
 
@@ -39,6 +41,15 @@ vi.mock('../store/habits', () => ({
     entries: mocks.entries,
   }),
 }))
+vi.mock('../store/plans', () => ({
+  usePlansStore: (selector: (state: {
+    hasPendingChanges: () => boolean
+    plans: unknown[]
+  }) => unknown) => selector({
+    hasPendingChanges: () => mocks.pendingPlans,
+    plans: mocks.plans,
+  }),
+}))
 vi.mock('../contexts/AuthContext', () => ({ useAuth: () => mocks.auth }))
 vi.mock('./useOnlineStatus', () => ({ useOnlineStatus: () => mocks.online }))
 
@@ -53,9 +64,11 @@ describe('useDriveSync', () => {
     mocks.auth.hasUsableAccessToken.mockReturnValue(true)
     mocks.pendingTasks = true
     mocks.pendingHabits = false
+    mocks.pendingPlans = false
     mocks.tasks = []
     mocks.habits = []
     mocks.entries = []
+    mocks.plans = []
     mocks.online = true
     Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' })
   })
@@ -107,6 +120,22 @@ describe('useDriveSync', () => {
     mocks.pendingTasks = false
     mocks.pendingHabits = true
     mocks.entries = [{ id: 'habit-1:2026-08-05' }]
+
+    rerender()
+    act(() => vi.advanceTimersByTime(1499))
+    expect(mocks.flush).not.toHaveBeenCalled()
+
+    act(() => vi.advanceTimersByTime(1))
+    expect(mocks.flush).toHaveBeenCalledOnce()
+  })
+
+  it('debounces a pending plan mutation and uploads it promptly', () => {
+    const { rerender } = renderHook(() => useDriveSync())
+    mocks.flush.mockClear()
+    mocks.pendingTasks = false
+    mocks.pendingHabits = false
+    mocks.pendingPlans = true
+    mocks.plans = [{ id: 'plan-1' }]
 
     rerender()
     act(() => vi.advanceTimersByTime(1499))

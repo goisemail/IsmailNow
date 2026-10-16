@@ -254,7 +254,9 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
       <HabitWizard
         open={habitWizardOpen}
         onClose={() => setHabitWizardOpen(false)}
-        onSave={(draft) => addHabit(draft)}
+        onSave={(draft) => {
+          addHabit(draft)
+        }}
       />
     </div>
   )

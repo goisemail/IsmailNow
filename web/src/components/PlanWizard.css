@@ -1,0 +1,50 @@
+.plan-wizard-time-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.plan-wizard-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #495057;
+  cursor: pointer;
+}
+
+.plan-wizard-checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: #E72372;
+  cursor: pointer;
+}
+
+.plan-wizard-links {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #dee2e6;
+}
+
+.plan-wizard-error {
+  margin: 6px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #dc3545;
+}
+
+@media (prefers-color-scheme: dark) {
+  .plan-wizard-checkbox {
+    color: #adb5bd;
+  }
+
+  .plan-wizard-links {
+    border-top-color: #495057;
+  }
+
+  .plan-wizard-error {
+    color: #ff6b81;
+  }
+}

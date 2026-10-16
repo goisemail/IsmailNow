@@ -17,6 +17,7 @@ import {
   type HabitEntry,
 } from '../store/habits'
 import { mergeTasks, useTasksStore, type PendingTask } from '../store/tasks'
+import { mergePlans, usePlansStore, type PendingPlan } from '../store/plans'
 
 export interface AppUser {
   uid: string
@@ -120,11 +121,13 @@ function activateLocalAccount(profile: AppUser): void {
   migrateLegacyStorage(ownerId)
   useTasksStore.getState().load(ownerId)
   void useHabitsStore.getState().load(ownerId)
+  usePlansStore.getState().load(ownerId)
 }
 
 function clearActiveAccount(): void {
   useTasksStore.getState().clearMemory()
   useHabitsStore.getState().clearMemory()
+  usePlansStore.getState().clearMemory()
   clearDriveCache()
 }
 
@@ -134,6 +137,7 @@ function exportCurrentMemory(): void {
     tasks: useTasksStore.getState().tasks,
     habits: useHabitsStore.getState().habits,
     habitEntries: useHabitsStore.getState().entries,
+    plans: usePlansStore.getState().plans,
   }, null, 2)
   const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }))
   const link = document.createElement('a')
@@ -388,9 +392,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const allowVolatileTransition = (): boolean => {
     const tasks = useTasksStore.getState()
     const habits = useHabitsStore.getState()
-    if (!tasks.hasVolatileChanges() && !habits.hasVolatileChanges()) return true
+    const plans = usePlansStore.getState()
+    if (!tasks.hasVolatileChanges() && !habits.hasVolatileChanges() && !plans.hasVolatileChanges()) return true
 
-    const persisted = tasks.retryPersistence() && habits.retryPersistence()
+    const persisted = tasks.retryPersistence() && habits.retryPersistence() && plans.retryPersistence()
     if (persisted) return true
 
     const choice = window.prompt(
@@ -412,7 +417,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const guestTasks = useTasksStore.getState().tasks
     const guestHabits = useHabitsStore.getState().habits
     const guestEntries = useHabitsStore.getState().entries
-    if (guestTasks.length === 0 && guestHabits.length === 0) return true
+    const guestPlans = usePlansStore.getState().plans
+    if (guestTasks.length === 0 && guestHabits.length === 0 && guestPlans.length === 0) return true
 
     const choice = window.prompt(
       'Guest data found. Type MERGE to copy it to Google, KEEP to leave it separate, EXPORT to download it, or DISCARD to remove it.',
@@ -444,6 +450,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const targetEntries = JSON.parse(
         localStorage.getItem(accountStorageKey(targetOwner, 'habitEntries')) ?? '[]',
       ) as HabitEntry[]
+      const targetPlans = JSON.parse(
+        localStorage.getItem(accountStorageKey(targetOwner, 'plans')) ?? '[]',
+      ) as PendingPlan[]
       const mergedTasks = mergeTasks(
         guestTasks.map((task) => ({ ...task, synced: false })),
         targetTasks,
@@ -456,9 +465,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         guestEntries.map((entry) => ({ ...entry, synced: false })),
         targetEntries,
       )
+      const mergedPlans = mergePlans(
+        guestPlans.map((plan) => ({ ...plan, synced: false })),
+        targetPlans,
+      )
       localStorage.setItem(accountStorageKey(targetOwner, 'tasks'), JSON.stringify(mergedTasks))
       localStorage.setItem(accountStorageKey(targetOwner, 'habits'), JSON.stringify(mergedHabits))
       localStorage.setItem(accountStorageKey(targetOwner, 'habitEntries'), JSON.stringify(mergedEntries))
+      localStorage.setItem(accountStorageKey(targetOwner, 'plans'), JSON.stringify(mergedPlans))
       discardGuestAfterSwitchRef.current = false
       return true
     } catch {
@@ -494,6 +508,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             localStorage.removeItem(accountStorageKey('guest:local', 'tasks'))
             localStorage.removeItem(accountStorageKey('guest:local', 'habits'))
             localStorage.removeItem(accountStorageKey('guest:local', 'habitEntries'))
+            localStorage.removeItem(accountStorageKey('guest:local', 'plans'))
           } finally {
             discardGuestAfterSwitchRef.current = false
           }

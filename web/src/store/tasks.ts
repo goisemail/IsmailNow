@@ -9,6 +9,7 @@ import {
   type TokenProvider,
 } from '../lib/googleDrive'
 import { mergeHabitEntries, mergeHabits, useHabitsStore } from './habits'
+import { mergePlans, usePlansStore } from './plans'
 
 export interface PendingTask {
   id: string
@@ -35,7 +36,7 @@ interface TasksStore {
   hasVolatileChanges: () => boolean
   retryPersistence: () => boolean
   fetchForDate: (date: string, getToken: TokenProvider | null) => Promise<void>
-  addTask: (title: string, startDate: string) => Promise<void>
+  addTask: (title: string, startDate: string) => Promise<string>
   updateTaskTitle: (id: string, title: string) => void
   markComplete: (id: string, date: string) => Promise<void>
   unmarkComplete: (id: string) => void
@@ -134,6 +135,7 @@ export const useTasksStore = create<TasksStore>((set, get) => {
       const localSnapshot = get().tasks.map(normalizeTask)
       const localHabits = useHabitsStore.getState().habits
       const localHabitEntries = useHabitsStore.getState().entries
+      const localPlans = usePlansStore.getState().plans
       const remote = await loadTasksFromDrive(getToken)
       const merged = mergeTasks(localSnapshot, remote.tasks).map((task) => ({ ...task, synced: true }))
       const mergedHabits = mergeHabits(localHabits, remote.habits ?? []).map((habit) => ({
@@ -144,6 +146,10 @@ export const useTasksStore = create<TasksStore>((set, get) => {
         ...entry,
         synced: true,
       }))
+      const mergedPlans = mergePlans(localPlans, remote.plans ?? []).map((plan) => ({
+        ...plan,
+        synced: true,
+      }))
 
       try {
         await saveTasksToDrive(
@@ -152,6 +158,7 @@ export const useTasksStore = create<TasksStore>((set, get) => {
           remote.file,
           mergedHabits,
           mergedHabitEntries,
+          mergedPlans,
           remote.duplicateFileIds ?? [],
           remote.contentFingerprint,
           true,
@@ -205,9 +212,21 @@ export const useTasksStore = create<TasksStore>((set, get) => {
       })
       useHabitsStore.getState().applySyncResult(reconciledHabits, reconciledEntries)
 
+      const latestPlans = usePlansStore.getState().plans
+      const uploadedPlans = new Map(mergedPlans.map((plan) => [plan.id, plan]))
+      const latestPlansById = new Map(latestPlans.map((plan) => [plan.id, plan]))
+      const reconciledPlans = mergePlans(latestPlans, mergedPlans).map((plan) => {
+        const uploaded = uploadedPlans.get(plan.id)
+        const current = latestPlansById.get(plan.id)
+        const changedDuringSync = Boolean(current && (!uploaded || current.updatedAt !== uploaded.updatedAt))
+        return { ...plan, synced: !changedDuringSync }
+      })
+      usePlansStore.getState().applySyncResult(reconciledPlans)
+
       return reconciled.some((task) => !task.synced) ||
         reconciledHabits.some((habit) => !habit.synced) ||
-        reconciledEntries.some((entry) => !entry.synced)
+        reconciledEntries.some((entry) => !entry.synced) ||
+        reconciledPlans.some((plan) => !plan.synced)
     }
     return false
   }
@@ -331,6 +350,7 @@ export const useTasksStore = create<TasksStore>((set, get) => {
         synced: false,
       }
       updateLocal((tasks) => [...tasks, task])
+      return id
     },
 
     updateTaskTitle: (id, title) => {
@@ -415,16 +435,17 @@ export const useTasksStore = create<TasksStore>((set, get) => {
         const tasks = restored.tasks.map((task) => ({ ...task, synced: true }))
         const habits = restored.habits.map((habit) => ({ ...habit, synced: true }))
         const entries = restored.habitEntries.map((entry) => ({ ...entry, synced: true }))
-        const ownerId = get().ownerId
-        if (!ownerId) throw new Error('No active account.')
-        const persisted = persist(ownerId, tasks)
-        set({
-          tasks,
-          loading: false,
-          volatile: !persisted,
-          error: persisted ? null : 'Restored tasks could not be saved in this browser.',
-        })
-        useHabitsStore.getState().applySyncResult(habits, entries)
+      const ownerId = get().ownerId
+      if (!ownerId) throw new Error('No active account.')
+      const persisted = persist(ownerId, tasks)
+      set({
+        tasks,
+        loading: false,
+        volatile: !persisted,
+        error: persisted ? null : 'Restored tasks could not be saved in this browser.',
+      })
+      useHabitsStore.getState().applySyncResult(habits, entries)
+      usePlansStore.getState().applySyncResult(restored.plans.map((plan) => ({ ...plan, synced: true })))
       } catch (error) {
         set({ loading: false, error: 'Backup restore failed.' })
         throw error

@@ -27,11 +27,11 @@
 - **Problem**: The old plan removed the header button group AND set `toolbar={false}`, leaving the user with no way to switch Day/Week/Month.
 - **Resolution**: Not applicable with the chosen approach — the RBC toolbar stays and provides both nav (Today/Back/Next) and the Day/Week/Month switcher.
 
-### 4. Missing + Button for Daily Planning — SPEC APPROVED (step 4)
+### 4. Missing + Button for Daily Planning — DONE (step 4)
 - **Problem**: No add affordance in the Planner tab.
-- **Fix**: FAB-style `+` button reusing the shared `.fab` class (identical to Home/Tasks: fixed, orange, above bottom nav — no new CSS) opening a new **PlanWizard** modal.
+- **Fix**: FAB reuses the shared `.fab` class (identical to Home/Tasks: fixed, orange, above bottom nav — no new CSS) and opens the new **PlanWizard** modal. Implemented in `Planner.tsx` with `data-testid="planner-fab"`.
 
-### 5. Plan for Day Feature Requirements — SPEC APPROVED (step 4)
+### 5. Plan for Day Feature Requirements — DONE (step 4)
 
 The + button opens **PlanWizard** with these fields:
 
@@ -55,17 +55,17 @@ The + button opens **PlanWizard** with these fields:
 
 **Purpose (user mental model):** the calendar shows allocated time blocks — "in this hour I do this task / this habit" — prepared ahead of the day.
 
-### 6. Fake Event Times in Calendar Mapping
+### 6. Fake Event Times in Calendar Mapping — DONE (step 4)
 - **Problem**: `Planner.tsx:24-27` fabricates times (`9 + index % 8`) instead of using real times, so events are plotted at meaningless positions.
-- **Fix**: Map **plans** (not tasks) to events: combine `startDate` + `startTime`/`endTime` into real event start/end.
+- **Fix**: Map **plans** (not tasks) to events: combine `startDate` + `startTime`/`endTime` into real event start/end. Implemented via `buildEvent` in `Planner.tsx`.
 
-### 7. No Recurrence Expansion
+### 7. No Recurrence Expansion — DONE (step 4)
 - **Problem**: react-big-calendar has no recurrence. A repeating plan (repeat end date) exists as a single record but must appear on every day in its range.
-- **Fix**: Expand repeating plans into per-day events using date-fns (`eachDayOfInterval` between `startDate` and `endDate`) when building `plannerEvents`.
+- **Fix**: Expand repeating plans into per-day events using date-fns (`eachDayOfInterval` between `startDate` and `endDate`) via `planOccurrenceDates` in `Planner.tsx`.
 
-### 8. Events Ignore Plan Styling and State
+### 8. Events Ignore Plan Styling and State — DONE (step 4)
 - **Problem**: Events render plain; plans have no distinct color/state, and linked vs standalone plans are indistinguishable.
-- **Fix (approved)**: Plans are the only calendar content (tasks/habits live in their tabs; Tasks-tab tasks have no times and would clutter the grid). Per-event styling for plans with a plan palette; visual distinction for linked plans.
+- **Fix**: Plans are the only calendar content (tasks/habits live in their tabs). `eventPropGetter` colors events by link state — blue for a linked task, purple for a linked habit, app accent pink for standalone plans.
 
 ### 9. Redundant Calendar Props — DONE (step 2)
 - **Problem**: `Planner.tsx:74-75` passes both `defaultView` and controlled `view` — redundant and triggers a react-big-calendar warning.
@@ -93,30 +93,28 @@ The + button opens **PlanWizard** with these fields:
 4. Layout for the new custom header, plan events, and the FAB
 5. Keep existing flex/height layout working with the smaller header
 
-### Phase 3: PlanWizard Component (components/PlanWizard.tsx + .css)
-Create new modal reusing `TaskWizard` conventions (overlay click + Escape close, themed card):
+### Phase 3: PlanWizard Component (components/PlanWizard.tsx + .css) — DONE (step 4)
+Implemented reusing `TaskWizard` conventions (overlay click + Escape close, themed card):
 - Form: planner name, start time, end time, day, repeats-daily toggle + repeat end date, "Also add as Task" checkbox, "Also add as Habit" checkbox
-- Validation: name required; end time after start time; repeat end date >= day
+- Validation: name required; end time after start time; repeat end date >= day (no `min` attribute on the repeat date — native constraint validation would block submission and hide the themed error)
 - On save:
-  1. Create the plan (always)
-  2. If Task checked → mount `TaskWizard` (`initialName` = plan name, `onSave` → `addTask(name, day)`)
-  3. If Habit checked → mount `HabitWizard` (`onSave` → `addHabit(draft)`), after the task wizard when both are checked
+  1. Creates the plan (always)
+  2. If Task checked → mounts `TaskWizard` (`initialName` = plan name, `onSave` → `addTask(name, day)`)
+  3. If Habit checked → mounts `HabitWizard` (`onSave` → `addHabit(draft)`), after the task wizard when both are checked
   4. Cancel in a chained wizard → plan stays, that link skipped
 - Close on cancel / overlay click / Escape
-- Styling matching app theme
 
-### Phase 4: Plans Store + Drive Sync (store/plans.ts, lib/googleDrive.ts)
-A plan exists independently of tasks/habits, so it gets its own store (modeled on `store/tasks.ts`):
-- New `PendingPlan` interface: `{ id, title, startDate, startTime, endTime, endDate, isRepeating, linkedTaskId?, linkedHabitId?, createdAt, updatedAt, synced }`
-- Store actions: `addPlan`, `load`, persistence via `accountStorageKey` (same pattern as tasks), volatile/pending handling
-- **Critical** — extend `lib/googleDrive.ts` or plans are silently dropped:
-  - New `parsePlans`: whitelist-rebuild on load — all plan fields must be included
-  - `canonicalData`: fingerprint whitelist — include plan fields or time-only edits cause lost updates / skipped writes
-  - Bump schema version for the new `plans` array
-- `addTask` / `addHabit` keep their existing signatures — chained wizards call them unchanged
+### Phase 4: Plans Store + Drive Sync (store/plans.ts, lib/googleDrive.ts) — DONE (step 4)
+A plan exists independently of tasks/habits, so it has its own store (modeled on `store/tasks.ts`):
+- `PendingPlan` interface: `{ id, title, startDate, startTime, endTime, endDate, isRepeating, linkedTaskId?, linkedHabitId?, createdAt, updatedAt, synced }`
+- Store actions: `addPlan` (returns id), `updatePlanLinks`, `load`, `applySyncResult`, volatile/pending handling, `accountStorageKey('…','plans')` persistence
+- `lib/googleDrive.ts` extended: new `parsePlans` (whitelist-rebuild with validation), `createDocument`/`canonicalData` include plans, schema bumped to v4 (v2/v3 files still accepted), `loadTasksFromDrive` / `saveTasksToDrive` / `restoreDriveBackup` round-trip plans
+- Tasks store `syncOnce` merges + reconciles plans alongside habits; `useDriveSync` triggers flushes on plan mutations
+- `addTask` / `addHabit` now return the created id (used for linking); existing callers unaffected
+- `AuthContext` loads/clears/merges/exports plans; guest→Google merge and discard handle plans
 - Tasks/Habits/Home tabs need **no changes** — linked records appear via the existing stores
 
-### Phase 5: Testing
+### Phase 5: Testing — DONE (step 4)
 Colocated vitest tests following repo conventions:
 - `Planner` event mapping: plans plotted at real times, no fabricated positions
 - Recurrence expansion: one repeating plan → one event per day in range
@@ -124,14 +122,16 @@ Colocated vitest tests following repo conventions:
 - `googleDrive`: plans parse + canonical round-trip all fields
 - `PlanWizard` validation: end time > start time; repeat end date >= day; chaining opens TaskWizard then HabitWizard
 
+Implemented: `store/plans.test.ts` (persist/relay/link/merge), `components/PlanWizard.test.tsx` (validation, chaining, cancel-keeps-plan, both-checkbox order), `lib/googleDrive.test.ts` extended (schema v4, plan round-trip, malformed-plan rejection, plan upload verification), `useDriveSync.test.tsx` extended (plan mutation flush).
+
 ## Verification Checklist
 - [x] Theme matches other tabs (light + dark)
 - [x] Single Day/Week/Month switcher; nav buttons work
-- [ ] + button opens PlanWizard with all fields
-- [ ] Plan appears at its real time on the calendar
-- [ ] Repeating plan appears on every day through its end date
-- [ ] Task checkbox → task created, visible in Tasks tab and Home
-- [ ] Habit checkbox → habit created, visible in Habits tab and Home
-- [ ] Both checkboxes → task wizard then habit wizard; cancel keeps plan only
-- [ ] Plans survive reload and Drive sync on a second device
-- [ ] No TypeScript errors / lint errors; `npm test` passes
+- [x] + button opens PlanWizard with all fields
+- [x] Plan appears at its real time on the calendar
+- [x] Repeating plan appears on every day through its end date
+- [x] Task checkbox → task created, visible in Tasks tab and Home
+- [x] Habit checkbox → habit created, visible in Habits tab and Home
+- [x] Both checkboxes → task wizard then habit wizard; cancel keeps plan only
+- [x] Plans survive reload and Drive sync on a second device (schema v4 with plan parse/canonical coverage)
+- [x] No TypeScript errors / lint errors; `npm test` passes (66 tests)
