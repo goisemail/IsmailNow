@@ -22,10 +22,57 @@
   cursor: pointer;
 }
 
+.plan-wizard-repeat-label {
+  margin-top: 16px;
+}
+
+.plan-wizard-weekday-picker {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.plan-wizard-weekday {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #dee2e6;
+  color: #495057;
+  background: #f8f9fa;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.plan-wizard-weekday:hover {
+  border-color: #adb5bd;
+}
+
+.plan-wizard-weekday.selected {
+  color: #ffffff;
+  background: #E72372;
+  border-color: #E72372;
+}
+
 .plan-wizard-links {
   margin-top: 18px;
   padding-top: 16px;
   border-top: 1px solid #dee2e6;
+}
+
+.plan-wizard-links .plan-wizard-checkbox {
+  margin-top: 10px;
+}
+
+.plan-wizard-links .plan-wizard-checkbox:first-child {
+  margin-top: 0;
+}
+
+.plan-wizard-hint {
+  margin: 2px 0 0 26px;
+  font-size: 12px;
+  color: #868e96;
 }
 
 .plan-wizard-error {
@@ -36,8 +83,28 @@
 }
 
 @media (prefers-color-scheme: dark) {
+  .plan-wizard-hint {
+    color: #868e96;
+  }
+
   .plan-wizard-checkbox {
     color: #adb5bd;
+  }
+
+  .plan-wizard-weekday {
+    color: #adb5bd;
+    background: #2d2d3a;
+    border-color: #495057;
+  }
+
+  .plan-wizard-weekday:hover {
+    border-color: #6c757d;
+  }
+
+  .plan-wizard-weekday.selected {
+    color: #ffffff;
+    background: #E72372;
+    border-color: #E72372;
   }
 
   .plan-wizard-links {

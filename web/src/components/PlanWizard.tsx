@@ -3,7 +3,6 @@ import type { HabitDraft } from '../store/habits'
 import { useHabitsStore } from '../store/habits'
 import { usePlansStore } from '../store/plans'
 import { useTasksStore } from '../store/tasks'
-import TaskWizard from './TaskWizard'
 import HabitWizard from './HabitWizard'
 import './TaskWizard.css'
 import './PlanWizard.css'
@@ -14,10 +13,20 @@ interface PlanWizardProps {
   defaultDate: string
 }
 
-type WizardPhase = 'plan' | 'task' | 'habit'
+type WizardPhase = 'plan' | 'habit'
 
 const DEFAULT_START = '09:00'
 const DEFAULT_END = '10:00'
+const ALL_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6]
+const WEEKDAY_OPTIONS = [
+  { day: 1, label: 'M' },
+  { day: 2, label: 'T' },
+  { day: 3, label: 'W' },
+  { day: 4, label: 'T' },
+  { day: 5, label: 'F' },
+  { day: 6, label: 'S' },
+  { day: 0, label: 'S' },
+]
 
 export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardProps) {
   const [title, setTitle] = useState('')
@@ -25,6 +34,7 @@ export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardPro
   const [startTime, setStartTime] = useState(DEFAULT_START)
   const [endTime, setEndTime] = useState(DEFAULT_END)
   const [isRepeating, setIsRepeating] = useState(false)
+  const [repeatDays, setRepeatDays] = useState<number[]>(ALL_WEEKDAYS)
   const [repeatEndDate, setRepeatEndDate] = useState('')
   const [addAsTask, setAddAsTask] = useState(false)
   const [addAsHabit, setAddAsHabit] = useState(false)
@@ -43,6 +53,7 @@ export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardPro
     setStartTime(DEFAULT_START)
     setEndTime(DEFAULT_END)
     setIsRepeating(false)
+    setRepeatDays(ALL_WEEKDAYS)
     setRepeatEndDate('')
     setAddAsTask(false)
     setAddAsHabit(false)
@@ -73,34 +84,28 @@ export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardPro
     onClose()
   }
 
-  const handlePlanSubmit = (event: React.FormEvent) => {
+  const handlePlanSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setShowErrors(true)
     if (!formValid) return
 
+    const planTitle = title.trim()
     const id = usePlansStore.getState().addPlan({
-      title: title.trim(),
+      title: planTitle,
       startDate: day,
       startTime,
       endTime,
       endDate: isRepeating ? repeatEndDate : null,
       isRepeating,
+      repeatDays: isRepeating ? repeatDays : null,
     })
     setPlanId(id)
 
-    if (addAsTask) setPhase('task')
-    else if (addAsHabit) setPhase('habit')
-    else resetAndClose()
-  }
+    if (addAsTask) {
+      const taskId = await useTasksStore.getState().addTask(planTitle, day)
+      usePlansStore.getState().updatePlanLinks(id, { linkedTaskId: taskId })
+    }
 
-  const handleTaskSaved = async (taskName: string) => {
-    const taskId = await useTasksStore.getState().addTask(taskName, day)
-    if (planId) usePlansStore.getState().updatePlanLinks(planId, { linkedTaskId: taskId })
-    if (addAsHabit) setPhase('habit')
-    else resetAndClose()
-  }
-
-  const handleTaskCancelled = () => {
     if (addAsHabit) setPhase('habit')
     else resetAndClose()
   }
@@ -109,18 +114,6 @@ export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardPro
     const habitId = useHabitsStore.getState().addHabit(draft)
     if (planId) usePlansStore.getState().updatePlanLinks(planId, { linkedHabitId: habitId })
     resetAndClose()
-  }
-
-  if (phase === 'task') {
-    return (
-      <TaskWizard
-        open
-        onClose={handleTaskCancelled}
-        onSave={handleTaskSaved}
-        initialName={title.trim()}
-        title="Add Task"
-      />
-    )
   }
 
   if (phase === 'habit') {
@@ -216,10 +209,29 @@ export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardPro
               onChange={(event) => setIsRepeating(event.target.checked)}
               data-testid="planWizardRepeat"
             />
-            Repeats daily
+            Repeats
           </label>
           {isRepeating && (
             <>
+              <span className="task-wizard-label plan-wizard-repeat-label">Repeat on</span>
+              <div className="plan-wizard-weekday-picker" role="group" aria-label="Repeat on days">
+                {WEEKDAY_OPTIONS.map(({ day, label }) => (
+                  <button
+                    key={day}
+                    type="button"
+                    className={`plan-wizard-weekday${repeatDays.includes(day) ? ' selected' : ''}`}
+                    onClick={() => setRepeatDays((current) => current.includes(day)
+                      ? current.filter((value) => value !== day)
+                      : [...current, day].sort((left, right) => left - right))}
+                    aria-pressed={repeatDays.includes(day)}
+                    aria-label={`Repeat on ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day]}`}
+                    data-testid={`planWizardDay-${day}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
               <label className="task-wizard-label" htmlFor="plan-wizard-repeat-end">
                 Repeat until
               </label>

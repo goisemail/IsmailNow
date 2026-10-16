@@ -4,54 +4,19 @@ import format from 'date-fns/format'
 import parse from 'date-fns/parse'
 import startOfWeek from 'date-fns/startOfWeek'
 import getDay from 'date-fns/getDay'
-import eachDayOfInterval from 'date-fns/eachDayOfInterval'
 import { enUS } from 'date-fns/locale'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import PlannerToolbar from '../components/PlannerToolbar'
 import PlanWizard from '../components/PlanWizard'
-import { usePlansStore, type PendingPlan } from '../store/plans'
+import { usePlansStore } from '../store/plans'
+import { buildEvent, planOccurrenceDates, type PlannerEvent } from '../utils/planner'
 import './Planner.css'
 
 const locales = { 'en-US': enUS }
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales })
 
-interface PlannerEvent {
-  id: string
-  title: string
-  start: Date
-  end: Date
-  linkedTask: boolean
-  linkedHabit: boolean
-}
-
 const LINKED_TASK_COLOR = '#0D6EFD'
 const LINKED_HABIT_COLOR = '#6F42C1'
-
-function planOccurrenceDates(plan: PendingPlan): string[] {
-  if (!plan.isRepeating) return [plan.startDate]
-  const end = plan.endDate && plan.endDate > plan.startDate ? plan.endDate : plan.startDate
-  return eachDayOfInterval({
-    start: new Date(`${plan.startDate}T00:00:00`),
-    end: new Date(`${end}T00:00:00`),
-  }).map((day) => format(day, 'yyyy-MM-dd'))
-}
-
-function buildEvent(plan: PendingPlan, dateKey: string): PlannerEvent {
-  const [startHour, startMinute] = plan.startTime.split(':').map(Number)
-  const [endHour, endMinute] = plan.endTime.split(':').map(Number)
-  const start = new Date(`${dateKey}T00:00:00`)
-  start.setHours(startHour, startMinute, 0, 0)
-  const end = new Date(start)
-  end.setHours(endHour, endMinute, 0, 0)
-  return {
-    id: `${plan.id}:${dateKey}`,
-    title: plan.title,
-    start,
-    end,
-    linkedTask: Boolean(plan.linkedTaskId),
-    linkedHabit: Boolean(plan.linkedHabitId),
-  }
-}
 
 export default function Planner() {
   const plans = usePlansStore((state) => state.plans)

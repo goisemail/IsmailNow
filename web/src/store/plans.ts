@@ -9,6 +9,7 @@ export interface PendingPlan {
   endTime: string
   endDate?: string | null
   isRepeating?: boolean
+  repeatDays?: number[] | null
   linkedTaskId?: string | null
   linkedHabitId?: string | null
   createdAt: string
@@ -23,6 +24,7 @@ export interface PlanDraft {
   endTime: string
   endDate?: string | null
   isRepeating?: boolean
+  repeatDays?: number[] | null
   linkedTaskId?: string | null
   linkedHabitId?: string | null
 }
@@ -55,11 +57,20 @@ function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 }
 
+function normalizeRepeatDays(days: unknown): number[] | null {
+  if (!Array.isArray(days)) return null
+  const valid = days
+    .filter((day): day is number => Number.isInteger(day) && day >= 0 && day <= 6)
+    .sort((left, right) => left - right)
+  return valid.length > 0 ? valid : null
+}
+
 export function normalizePlan(plan: PendingPlan): PendingPlan {
   return {
     ...plan,
     endDate: plan.endDate ?? null,
     isRepeating: plan.isRepeating === true,
+    repeatDays: normalizeRepeatDays(plan.repeatDays),
     linkedTaskId: plan.linkedTaskId ?? null,
     linkedHabitId: plan.linkedHabitId ?? null,
     synced: plan.synced !== false,
@@ -143,6 +154,7 @@ export const usePlansStore = create<PlansStore>((set, get) => {
         endTime: draft.endTime,
         endDate: draft.isRepeating ? (draft.endDate ?? null) : null,
         isRepeating: draft.isRepeating === true,
+        repeatDays: draft.isRepeating ? normalizeRepeatDays(draft.repeatDays) : null,
         linkedTaskId: draft.linkedTaskId ?? null,
         linkedHabitId: draft.linkedHabitId ?? null,
         createdAt: now,

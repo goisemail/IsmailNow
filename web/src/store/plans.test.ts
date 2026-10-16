@@ -68,6 +68,30 @@ describe('plans store', () => {
     })
   })
 
+  it('stores selected weekday repeats and treats an empty selection as daily', () => {
+    usePlansStore.getState().addPlan({
+      title: 'Weekend gym',
+      startDate: '2026-07-28',
+      startTime: '10:00',
+      endTime: '11:00',
+      isRepeating: true,
+      endDate: '2026-08-04',
+      repeatDays: [6, 0],
+    })
+    usePlansStore.getState().addPlan({
+      title: 'Daily reset',
+      startDate: '2026-07-28',
+      startTime: '08:00',
+      endTime: '08:15',
+      isRepeating: true,
+      endDate: '2026-08-04',
+      repeatDays: [],
+    })
+
+    expect(usePlansStore.getState().plans[0].repeatDays).toEqual([0, 6])
+    expect(usePlansStore.getState().plans[1].repeatDays).toBeNull()
+  })
+
   it('links a plan to a task and marks it unsynced', () => {
     const id = usePlansStore.getState().addPlan({
       title: 'Gym',

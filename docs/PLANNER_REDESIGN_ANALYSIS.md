@@ -41,17 +41,23 @@ The + button opens **PlanWizard** with these fields:
 | **Start Time** | Time input (`HH:mm`) | When the block starts on the selected day |
 | **End Time** | Time input (`HH:mm`) | Must be later than start time |
 | **Day** | Date input | Which day the plan applies to |
-| **Repeats daily** | Checkbox + end date input | When checked, the plan repeats daily through the end date |
-| **Also add as Task** | Checkbox | On save, chains `TaskWizard` (prefilled with plan name); task lands in Tasks tab + Home |
-| **Also add as Habit** | Checkbox | On save, chains `HabitWizard` (name/color/evaluation/frequency/priority…); habit lands in Habits tab + Home |
+| **Repeats** | Checkbox + weekday picker + end date input | When checked, a "Repeat on" row of 7 day circles (`M T W T F S S`) appears with **all days selected by default** (daily). Deselect circles to restrict to specific weekdays (e.g. only S + S for weekends). Plan repeats on those weekdays through the end date |
+| **Also add as Task** | Checkbox | On save, creates the task instantly in the Tasks tab (name = plan name, day = plan day) and links it — no extra wizard |
+| **Also add as Habit** | Checkbox | On save, opens `HabitWizard` (name/colour/evaluation/frequency/priority); habit lands in Habits tab + Home |
 
 **Approved flow:**
 1. Save → the plan is created immediately (always; checkboxes optional — a plan can exist alone)
-2. If **Task** checked → `TaskWizard` opens (`initialName` = plan name) → save calls existing `addTask(name, day)`
-3. If **Habit** checked → `HabitWizard` opens → save calls existing `addHabit(draft)` (after the task wizard when both are checked)
-4. Chaining order when both checked: **Task → Habit**
-5. Cancelling a chained wizard keeps the plan and skips that link (no task/habit created)
+2. If **Task** checked → the task is created **silently** via `addTask(planName, day)` and linked (`plan.linkedTaskId`) — no wizard, since TaskWizard only collected the name the plan already has
+3. If **Habit** checked → `HabitWizard` opens (it configures colour/evaluation/frequency/priority that cannot be inferred) → save calls `addHabit(draft)`
+4. When both are checked: task created instantly, then the habit wizard is the only modal
+5. Cancelling the habit wizard keeps the plan and the already-created task, and skips the habit link
 6. Plan edit/delete deferred to a later step
+
+Hint labels under the checkboxes make the difference discoverable ("Created instantly in the Tasks tab…" / "Opens the habit setup wizard…").
+
+**Repeat nuances (implemented):**
+- All 7 circles selected by default = daily repeat; empty selection falls back to daily
+- The plan's own day is always shown, even if its weekday is deselected; later occurrences follow the selected weekdays
 
 **Purpose (user mental model):** the calendar shows allocated time blocks — "in this hour I do this task / this habit" — prepared ahead of the day.
 
@@ -59,9 +65,9 @@ The + button opens **PlanWizard** with these fields:
 - **Problem**: `Planner.tsx:24-27` fabricates times (`9 + index % 8`) instead of using real times, so events are plotted at meaningless positions.
 - **Fix**: Map **plans** (not tasks) to events: combine `startDate` + `startTime`/`endTime` into real event start/end. Implemented via `buildEvent` in `Planner.tsx`.
 
-### 7. No Recurrence Expansion — DONE (step 4)
+### 7. No Recurrence Expansion — DONE (step 4, weekdays added later)
 - **Problem**: react-big-calendar has no recurrence. A repeating plan (repeat end date) exists as a single record but must appear on every day in its range.
-- **Fix**: Expand repeating plans into per-day events using date-fns (`eachDayOfInterval` between `startDate` and `endDate`) via `planOccurrenceDates` in `Planner.tsx`.
+- **Fix**: Expand repeating plans into per-day events using date-fns (`eachDayOfInterval` between `startDate` and `endDate`) via `planOccurrenceDates`. With `repeatDays` set, only matching weekdays occur (plus the plan's own day). Lives in `utils/planner.ts` with unit tests.
 
 ### 8. Events Ignore Plan Styling and State — DONE (step 4)
 - **Problem**: Events render plain; plans have no distinct color/state, and linked vs standalone plans are indistinguishable.
@@ -95,18 +101,18 @@ The + button opens **PlanWizard** with these fields:
 
 ### Phase 3: PlanWizard Component (components/PlanWizard.tsx + .css) — DONE (step 4)
 Implemented reusing `TaskWizard` conventions (overlay click + Escape close, themed card):
-- Form: planner name, start time, end time, day, repeats-daily toggle + repeat end date, "Also add as Task" checkbox, "Also add as Habit" checkbox
+- Form: planner name, start time, end time, day, `Repeats` checkbox with weekday picker (7 circles, all selected by default) + repeat end date, "Also add as Task" checkbox, "Also add as Habit" checkbox
 - Validation: name required; end time after start time; repeat end date >= day (no `min` attribute on the repeat date — native constraint validation would block submission and hide the themed error)
 - On save:
   1. Creates the plan (always)
-  2. If Task checked → mounts `TaskWizard` (`initialName` = plan name, `onSave` → `addTask(name, day)`)
-  3. If Habit checked → mounts `HabitWizard` (`onSave` → `addHabit(draft)`), after the task wizard when both are checked
-  4. Cancel in a chained wizard → plan stays, that link skipped
+  2. If Task checked → creates the task instantly via `addTask(planName, day)` and links it — **no TaskWizard** (it only re-collected the plan name)
+  3. If Habit checked → mounts `HabitWizard` (`onSave` → `addHabit(draft)`)
+  4. Cancel in the habit wizard → plan + task stay, habit link skipped
 - Close on cancel / overlay click / Escape
 
 ### Phase 4: Plans Store + Drive Sync (store/plans.ts, lib/googleDrive.ts) — DONE (step 4)
 A plan exists independently of tasks/habits, so it has its own store (modeled on `store/tasks.ts`):
-- `PendingPlan` interface: `{ id, title, startDate, startTime, endTime, endDate, isRepeating, linkedTaskId?, linkedHabitId?, createdAt, updatedAt, synced }`
+- `PendingPlan` interface: `{ id, title, startDate, startTime, endTime, endDate, isRepeating, repeatDays, linkedTaskId?, linkedHabitId?, createdAt, updatedAt, synced }` — `repeatDays` is `number[] | null` (weekday indices `0=Sun…6=Sat`; `null`/empty = daily)
 - Store actions: `addPlan` (returns id), `updatePlanLinks`, `load`, `applySyncResult`, volatile/pending handling, `accountStorageKey('…','plans')` persistence
 - `lib/googleDrive.ts` extended: new `parsePlans` (whitelist-rebuild with validation), `createDocument`/`canonicalData` include plans, schema bumped to v4 (v2/v3 files still accepted), `loadTasksFromDrive` / `saveTasksToDrive` / `restoreDriveBackup` round-trip plans
 - Tasks store `syncOnce` merges + reconciles plans alongside habits; `useDriveSync` triggers flushes on plan mutations
@@ -130,8 +136,9 @@ Implemented: `store/plans.test.ts` (persist/relay/link/merge), `components/PlanW
 - [x] + button opens PlanWizard with all fields
 - [x] Plan appears at its real time on the calendar
 - [x] Repeating plan appears on every day through its end date
-- [x] Task checkbox → task created, visible in Tasks tab and Home
+- [x] Weekday repeat: all 7 circles default-selected; picking only Sat/Sun allocates time only on those days
+- [x] Task checkbox → task created, visible in Tasks tab and Home (instant, no wizard)
 - [x] Habit checkbox → habit created, visible in Habits tab and Home
-- [x] Both checkboxes → task wizard then habit wizard; cancel keeps plan only
+- [x] Both checkboxes → task created instantly, habit wizard follows; cancel keeps plan + task
 - [x] Plans survive reload and Drive sync on a second device (schema v4 with plan parse/canonical coverage)
-- [x] No TypeScript errors / lint errors; `npm test` passes (66 tests)
+- [x] No TypeScript errors / lint errors; `npm test` passes (72 tests)

@@ -211,6 +211,9 @@ function parsePlans(candidates: unknown[]): PendingPlan[] {
     if (raw.endDate !== undefined && raw.endDate !== null && !endDate) {
       throw new DriveDataError(`Plan ${index + 1} has an invalid repeat end date.`)
     }
+    const repeatDays = Array.isArray(raw.repeatDays)
+      ? raw.repeatDays.filter((day): day is number => Number.isInteger(day) && day >= 0 && day <= 6).sort((a, b) => a - b)
+      : null
     return {
       id,
       title,
@@ -219,6 +222,7 @@ function parsePlans(candidates: unknown[]): PendingPlan[] {
       endTime,
       endDate,
       isRepeating: raw.isRepeating === true,
+      repeatDays: repeatDays && repeatDays.length > 0 ? repeatDays : null,
       linkedTaskId: typeof raw.linkedTaskId === 'string' ? raw.linkedTaskId : null,
       linkedHabitId: typeof raw.linkedHabitId === 'string' ? raw.linkedHabitId : null,
       createdAt,
@@ -422,6 +426,7 @@ function canonicalData(tasks: PendingTask[], habits: Habit[], habitEntries: Habi
         endTime: plan.endTime,
         endDate: plan.endDate ?? null,
         isRepeating: plan.isRepeating === true,
+        repeatDays: plan.repeatDays ?? null,
         linkedTaskId: plan.linkedTaskId ?? null,
         linkedHabitId: plan.linkedHabitId ?? null,
         createdAt: plan.createdAt,
