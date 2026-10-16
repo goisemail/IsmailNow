@@ -3,6 +3,7 @@ import type { HabitDraft } from '../store/habits'
 import { useHabitsStore } from '../store/habits'
 import { usePlansStore } from '../store/plans'
 import { useTasksStore } from '../store/tasks'
+import { planOccurrenceDates } from '../utils/planner'
 import HabitWizard from './HabitWizard'
 import './TaskWizard.css'
 import './PlanWizard.css'
@@ -102,8 +103,13 @@ export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardPro
     setPlanId(id)
 
     if (addAsTask) {
-      const taskId = await useTasksStore.getState().addTask(planTitle, day)
-      usePlansStore.getState().updatePlanLinks(id, { linkedTaskId: taskId })
+      const createdPlan = usePlansStore.getState().plans.find((plan) => plan.id === id)
+      const occurrenceDates = createdPlan ? planOccurrenceDates(createdPlan) : [day]
+      const taskIds: string[] = []
+      for (const occurrenceDate of occurrenceDates) {
+        taskIds.push(await useTasksStore.getState().addTask(planTitle, occurrenceDate))
+      }
+      usePlansStore.getState().updatePlanLinks(id, { linkedTaskIds: taskIds })
     }
 
     if (addAsHabit) setPhase('habit')

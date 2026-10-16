@@ -263,10 +263,11 @@ describe('Drive repository', () => {
       startDate: '2026-07-28',
       startTime: '09:00',
       endTime: '11:00',
-      endDate: null,
-      isRepeating: false,
-      repeatDays: null,
-      linkedTaskId: 'task-1',
+      endDate: '2026-08-04',
+      isRepeating: true,
+      repeatDays: [1, 5],
+      linkedTaskId: null,
+      linkedTaskIds: ['task-1', 'task-2'],
       linkedHabitId: null,
       createdAt: '2026-07-28T00:00:00.000Z',
       updatedAt: '2026-07-28T00:00:00.000Z',
@@ -299,7 +300,7 @@ describe('Drive repository', () => {
       schemaVersion: 4,
       habits: [{ id: 'habit-1', name: 'Read' }],
       habitEntries: [{ id: 'habit-1:2026-07-28', state: 'completed' }],
-      plans: [{ id: 'plan-1', title: 'Deep work', startTime: '09:00', linkedTaskId: 'task-1' }],
+      plans: [{ id: 'plan-1', title: 'Deep work', startTime: '09:00', repeatDays: [1, 5], linkedTaskIds: ['task-1', 'task-2'] }],
     })
   })
 })

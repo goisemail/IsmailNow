@@ -108,6 +108,22 @@ describe('plans store', () => {
     })
   })
 
+  it('links a plan to one task per occurrence', () => {
+    const id = usePlansStore.getState().addPlan({
+      title: 'Gym',
+      startDate: '2026-07-28',
+      startTime: '18:00',
+      endTime: '19:00',
+    })
+
+    usePlansStore.getState().updatePlanLinks(id, { linkedTaskIds: ['task-1', 'task-2'] })
+
+    expect(usePlansStore.getState().plans[0]).toMatchObject({
+      linkedTaskIds: ['task-1', 'task-2'],
+      synced: false,
+    })
+  })
+
   it('reloads stored plans for the account', () => {
     usePlansStore.getState().addPlan({
       title: 'Journal',

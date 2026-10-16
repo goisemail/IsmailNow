@@ -21,12 +21,7 @@ export function planOccurrenceDates(plan: PendingPlan): string[] {
 
   const repeatDays = plan.repeatDays && plan.repeatDays.length > 0 ? plan.repeatDays : null
   if (!repeatDays) return dateKeys
-
-  const [firstDay, ...remainingDays] = dateKeys
-  return [
-    firstDay,
-    ...remainingDays.filter((key) => repeatDays.includes(new Date(`${key}T00:00:00`).getDay())),
-  ]
+  return dateKeys.filter((key) => repeatDays.includes(new Date(`${key}T00:00:00`).getDay()))
 }
 
 export function buildEvent(plan: PendingPlan, dateKey: string): PlannerEvent {
@@ -41,7 +36,7 @@ export function buildEvent(plan: PendingPlan, dateKey: string): PlannerEvent {
     title: plan.title,
     start,
     end,
-    linkedTask: Boolean(plan.linkedTaskId),
+    linkedTask: Boolean(plan.linkedTaskId) || (plan.linkedTaskIds?.length ?? 0) > 0,
     linkedHabit: Boolean(plan.linkedHabitId),
   }
 }

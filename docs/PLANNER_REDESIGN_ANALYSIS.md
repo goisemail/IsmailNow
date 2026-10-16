@@ -47,7 +47,7 @@ The + button opens **PlanWizard** with these fields:
 
 **Approved flow:**
 1. Save → the plan is created immediately (always; checkboxes optional — a plan can exist alone)
-2. If **Task** checked → the task is created **silently** via `addTask(planName, day)` and linked (`plan.linkedTaskId`) — no wizard, since TaskWizard only collected the name the plan already has
+2. If **Task** checked → **one task is created per plan occurrence** (same title, each dated to its occurrence day — creation day included only if its weekday is selected) and their ids are stored in `plan.linkedTaskIds` — no wizard, since TaskWizard only collected the name the plan already has
 3. If **Habit** checked → `HabitWizard` opens (it configures colour/evaluation/frequency/priority that cannot be inferred) → save calls `addHabit(draft)`
 4. When both are checked: task created instantly, then the habit wizard is the only modal
 5. Cancelling the habit wizard keeps the plan and the already-created task, and skips the habit link
@@ -57,7 +57,7 @@ Hint labels under the checkboxes make the difference discoverable ("Created inst
 
 **Repeat nuances (implemented):**
 - All 7 circles selected by default = daily repeat; empty selection falls back to daily
-- The plan's own day is always shown, even if its weekday is deselected; later occurrences follow the selected weekdays
+- Strict weekday matching: the creation day is shown **only if its weekday is selected** (e.g. created Thursday with Mon/Fri repeat → first plan is the next Friday)
 
 **Purpose (user mental model):** the calendar shows allocated time blocks — "in this hour I do this task / this habit" — prepared ahead of the day.
 
@@ -105,14 +105,14 @@ Implemented reusing `TaskWizard` conventions (overlay click + Escape close, them
 - Validation: name required; end time after start time; repeat end date >= day (no `min` attribute on the repeat date — native constraint validation would block submission and hide the themed error)
 - On save:
   1. Creates the plan (always)
-  2. If Task checked → creates the task instantly via `addTask(planName, day)` and links it — **no TaskWizard** (it only re-collected the plan name)
+  2. If Task checked → creates one task per occurrence via `addTask(planName, occurrenceDate)` and links them all through `linkedTaskIds` — **no TaskWizard** (it only re-collected the plan name)
   3. If Habit checked → mounts `HabitWizard` (`onSave` → `addHabit(draft)`)
   4. Cancel in the habit wizard → plan + task stay, habit link skipped
 - Close on cancel / overlay click / Escape
 
 ### Phase 4: Plans Store + Drive Sync (store/plans.ts, lib/googleDrive.ts) — DONE (step 4)
 A plan exists independently of tasks/habits, so it has its own store (modeled on `store/tasks.ts`):
-- `PendingPlan` interface: `{ id, title, startDate, startTime, endTime, endDate, isRepeating, repeatDays, linkedTaskId?, linkedHabitId?, createdAt, updatedAt, synced }` — `repeatDays` is `number[] | null` (weekday indices `0=Sun…6=Sat`; `null`/empty = daily)
+- `PendingPlan` interface: `{ id, title, startDate, startTime, endTime, endDate, isRepeating, repeatDays, linkedTaskId?, linkedTaskIds?, linkedHabitId?, createdAt, updatedAt, synced }` — `repeatDays` is `number[] | null` (weekday indices `0=Sun…6=Sat`; `null`/empty = daily); `linkedTaskIds` holds one id per created task occurrence
 - Store actions: `addPlan` (returns id), `updatePlanLinks`, `load`, `applySyncResult`, volatile/pending handling, `accountStorageKey('…','plans')` persistence
 - `lib/googleDrive.ts` extended: new `parsePlans` (whitelist-rebuild with validation), `createDocument`/`canonicalData` include plans, schema bumped to v4 (v2/v3 files still accepted), `loadTasksFromDrive` / `saveTasksToDrive` / `restoreDriveBackup` round-trip plans
 - Tasks store `syncOnce` merges + reconciles plans alongside habits; `useDriveSync` triggers flushes on plan mutations
@@ -137,8 +137,8 @@ Implemented: `store/plans.test.ts` (persist/relay/link/merge), `components/PlanW
 - [x] Plan appears at its real time on the calendar
 - [x] Repeating plan appears on every day through its end date
 - [x] Weekday repeat: all 7 circles default-selected; picking only Sat/Sun allocates time only on those days
-- [x] Task checkbox → task created, visible in Tasks tab and Home (instant, no wizard)
+- [x] Task checkbox → one task per planned occurrence, visible in Tasks tab and Home (instant, no wizard)
 - [x] Habit checkbox → habit created, visible in Habits tab and Home
 - [x] Both checkboxes → task created instantly, habit wizard follows; cancel keeps plan + task
 - [x] Plans survive reload and Drive sync on a second device (schema v4 with plan parse/canonical coverage)
-- [x] No TypeScript errors / lint errors; `npm test` passes (72 tests)
+- [x] No TypeScript errors / lint errors; `npm test` passes (75 tests)

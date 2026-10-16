@@ -11,6 +11,7 @@ export interface PendingPlan {
   isRepeating?: boolean
   repeatDays?: number[] | null
   linkedTaskId?: string | null
+  linkedTaskIds?: string[] | null
   linkedHabitId?: string | null
   createdAt: string
   updatedAt: string
@@ -26,6 +27,7 @@ export interface PlanDraft {
   isRepeating?: boolean
   repeatDays?: number[] | null
   linkedTaskId?: string | null
+  linkedTaskIds?: string[] | null
   linkedHabitId?: string | null
 }
 
@@ -40,7 +42,7 @@ interface PlansStore {
   hasVolatileChanges: () => boolean
   retryPersistence: () => boolean
   addPlan: (draft: PlanDraft) => string
-  updatePlanLinks: (id: string, links: { linkedTaskId?: string | null; linkedHabitId?: string | null }) => void
+  updatePlanLinks: (id: string, links: { linkedTaskId?: string | null; linkedTaskIds?: string[] | null; linkedHabitId?: string | null }) => void
   applySyncResult: (plans: PendingPlan[]) => void
 }
 
@@ -55,6 +57,12 @@ function saveToStorage(ownerId: string, plans: PendingPlan[]): void {
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
+}
+
+function normalizeTaskIds(ids: unknown): string[] | null {
+  if (!Array.isArray(ids)) return null
+  const valid = ids.filter((id): id is string => typeof id === 'string' && id.length > 0)
+  return valid.length > 0 ? valid : null
 }
 
 function normalizeRepeatDays(days: unknown): number[] | null {
@@ -72,6 +80,7 @@ export function normalizePlan(plan: PendingPlan): PendingPlan {
     isRepeating: plan.isRepeating === true,
     repeatDays: normalizeRepeatDays(plan.repeatDays),
     linkedTaskId: plan.linkedTaskId ?? null,
+    linkedTaskIds: normalizeTaskIds(plan.linkedTaskIds),
     linkedHabitId: plan.linkedHabitId ?? null,
     synced: plan.synced !== false,
   }
@@ -173,18 +182,19 @@ export const usePlansStore = create<PlansStore>((set, get) => {
       return id
     },
 
-    updatePlanLinks: (id, links) => {
-      const ownerId = get().ownerId
-      if (!ownerId) return
-      const plans = get().plans.map((plan) => plan.id === id
-        ? {
-          ...plan,
-          ...(links.linkedTaskId !== undefined ? { linkedTaskId: links.linkedTaskId } : {}),
-          ...(links.linkedHabitId !== undefined ? { linkedHabitId: links.linkedHabitId } : {}),
-          updatedAt: new Date().toISOString(),
-          synced: false,
-        }
-        : plan)
+  updatePlanLinks: (id, links) => {
+    const ownerId = get().ownerId
+    if (!ownerId) return
+    const plans = get().plans.map((plan) => plan.id === id
+      ? {
+        ...plan,
+        ...(links.linkedTaskId !== undefined ? { linkedTaskId: links.linkedTaskId } : {}),
+        ...(links.linkedTaskIds !== undefined ? { linkedTaskIds: links.linkedTaskIds } : {}),
+        ...(links.linkedHabitId !== undefined ? { linkedHabitId: links.linkedHabitId } : {}),
+        updatedAt: new Date().toISOString(),
+        synced: false,
+      }
+      : plan)
       const persisted = persist(ownerId, plans)
       set({
         plans,

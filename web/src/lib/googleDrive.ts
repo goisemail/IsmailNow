@@ -214,6 +214,9 @@ function parsePlans(candidates: unknown[]): PendingPlan[] {
     const repeatDays = Array.isArray(raw.repeatDays)
       ? raw.repeatDays.filter((day): day is number => Number.isInteger(day) && day >= 0 && day <= 6).sort((a, b) => a - b)
       : null
+    const linkedTaskIds = Array.isArray(raw.linkedTaskIds)
+      ? raw.linkedTaskIds.filter((taskId): taskId is string => typeof taskId === 'string' && taskId.length > 0)
+      : null
     return {
       id,
       title,
@@ -224,6 +227,7 @@ function parsePlans(candidates: unknown[]): PendingPlan[] {
       isRepeating: raw.isRepeating === true,
       repeatDays: repeatDays && repeatDays.length > 0 ? repeatDays : null,
       linkedTaskId: typeof raw.linkedTaskId === 'string' ? raw.linkedTaskId : null,
+      linkedTaskIds: linkedTaskIds && linkedTaskIds.length > 0 ? linkedTaskIds : null,
       linkedHabitId: typeof raw.linkedHabitId === 'string' ? raw.linkedHabitId : null,
       createdAt,
       updatedAt,
@@ -428,6 +432,7 @@ function canonicalData(tasks: PendingTask[], habits: Habit[], habitEntries: Habi
         isRepeating: plan.isRepeating === true,
         repeatDays: plan.repeatDays ?? null,
         linkedTaskId: plan.linkedTaskId ?? null,
+        linkedTaskIds: plan.linkedTaskIds ?? null,
         linkedHabitId: plan.linkedHabitId ?? null,
         createdAt: plan.createdAt,
         updatedAt: plan.updatedAt,

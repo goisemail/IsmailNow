@@ -106,8 +106,30 @@ describe('PlanWizard', () => {
     expect(plans).toHaveLength(1)
     expect(tasks).toHaveLength(1)
     expect(tasks[0]).toMatchObject({ title: 'Gym session', startDate: '2026-10-15' })
-    expect(plans[0].linkedTaskId).toBe(tasks[0].id)
+    expect(plans[0].linkedTaskIds).toEqual([tasks[0].id])
     expect(screen.queryByTestId('taskWizardInput')).not.toBeInTheDocument()
+  })
+
+  it('creates one task per selected weekday, skipping the creation day', async () => {
+    const onClose = vi.fn()
+    render(<PlanWizard open onClose={onClose} defaultDate="2026-10-15" />)
+
+    await userEvent.type(screen.getByTestId('planWizardName'), 'Monday Friday block')
+    await userEvent.click(screen.getByTestId('planWizardAddTask'))
+    await userEvent.click(screen.getByTestId('planWizardRepeat'))
+    for (const day of [0, 2, 3, 4, 6]) {
+      await userEvent.click(screen.getByTestId(`planWizardDay-${day}`))
+    }
+    fireEvent.change(screen.getByTestId('planWizardRepeatEnd'), { target: { value: '2026-10-31' } })
+    await userEvent.click(screen.getByTestId('planWizardSave'))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    const taskDates = useTasksStore.getState().tasks.map((task) => task.startDate)
+    expect(taskDates).toEqual(['2026-10-16', '2026-10-19', '2026-10-23', '2026-10-26', '2026-10-30'])
+    expect(useTasksStore.getState().tasks.every((task) => task.title === 'Monday Friday block')).toBe(true)
+    expect(usePlansStore.getState().plans[0].linkedTaskIds).toEqual(
+      useTasksStore.getState().tasks.map((task) => task.id),
+    )
   })
 
   it('keeps the plan and task when the chained habit wizard is cancelled', async () => {

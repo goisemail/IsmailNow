@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useTasksStore, PendingTask } from '../store/tasks'
+import { useTasksStore, taskVisibleOnDate, PendingTask } from '../store/tasks'
 import { useAuth } from '../contexts/AuthContext'
 import { Pencil, Trash2 } from 'lucide-react'
 import { formatDate } from '../utils/date'
@@ -31,7 +31,7 @@ export default function Tasks() {
     }
   }
 
-  const pending = tasks.filter((t) => !t.completedDate && !t.isDeleted)
+  const pending = tasks.filter((t) => taskVisibleOnDate(t, today))
   const completed = tasks
     .filter((t) => !!t.completedDate && !t.isDeleted)
     .sort((a, b) => {

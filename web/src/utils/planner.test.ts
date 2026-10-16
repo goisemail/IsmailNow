@@ -48,19 +48,31 @@ describe('planner event building', () => {
     ])
   })
 
-  it('repeats only on the selected weekdays and always keeps the first day', () => {
-    const plan = makePlan({
-      isRepeating: true,
-      endDate: '2026-10-29',
-      repeatDays: [6, 0],
-    })
+  it('repeats only on the selected weekdays', () => {
+    const plan = makePlan({ isRepeating: true, endDate: '2026-10-29', repeatDays: [6, 0] })
 
     expect(planOccurrenceDates(plan)).toEqual([
-      '2026-10-16',
       '2026-10-17',
       '2026-10-18',
       '2026-10-24',
       '2026-10-25',
+    ])
+  })
+
+  it('skips the creation day when its weekday is not selected', () => {
+    const plan = makePlan({
+      startDate: '2026-10-15',
+      isRepeating: true,
+      endDate: '2026-10-31',
+      repeatDays: [1, 5],
+    })
+
+    expect(planOccurrenceDates(plan)).toEqual([
+      '2026-10-16',
+      '2026-10-19',
+      '2026-10-23',
+      '2026-10-26',
+      '2026-10-30',
     ])
   })
 
