@@ -13,7 +13,7 @@ import {
   type HabitEntry,
   type HabitStats,
 } from '../store/habits'
-import { BarChart3, Edit2, Trash2 } from 'lucide-react'
+import { BarChart3, Edit2, Plus, Trash2 } from 'lucide-react'
 import HabitWizard from '../components/HabitWizard'
 import HabitStateControl from '../components/HabitStateControl'
 import './Habits.css'

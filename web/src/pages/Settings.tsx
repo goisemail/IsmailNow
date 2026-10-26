@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { Trash2 } from 'lucide-react'
 import { listDriveBackups, type DriveBackup } from '../lib/googleDrive'
 import './Settings.css'
+import { buildBackupJson } from '../lib/backup'
 
 export default function Settings() {
   const allHabits = useHabitsStore((state) => state.habits)
