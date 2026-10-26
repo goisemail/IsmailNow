@@ -117,6 +117,47 @@ body {
   transition: width 0.3s ease;
 }
 
+.fab {
+  position: fixed;
+  bottom: 92px;
+  right: 22px;
+  width: 62px;
+  height: 62px;
+  border: none;
+  border-radius: 50%;
+  color: #ffffff;
+  background: #FF9500;
+  box-shadow: 0 4px 12px rgba(255, 149, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 20;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(255, 149, 0, 0.5);
+}
+
+.fab:active {
+  transform: scale(0.95);
+}
+
+@media (max-width: 576px) {
+  .fab {
+    bottom: 76px;
+    right: 16px;
+    width: 56px;
+    height: 56px;
+    font-size: 30px;
+  }
+}
+
 /* Responsive utilities */
 @media (max-width: 768px) {
   .container-md {
