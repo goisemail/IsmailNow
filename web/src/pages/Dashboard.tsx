@@ -11,7 +11,7 @@ import {
   type HabitEntry,
 } from '../store/habits'
 import { useTasksStore, taskVisibleOnDate } from '../store/tasks'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus } from 'lucide-react'
 import './Dashboard.css'
 import QuickAddSheet from '../components/QuickAddSheet'
 import HabitWizard from '../components/HabitWizard'
@@ -234,7 +234,7 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
         aria-label="Quick add"
         data-testid="fab"
       >
-        +
+        <Plus size={34} />
       </button>
 
       <QuickAddSheet
@@ -253,7 +253,9 @@ export default function Dashboard({ selectedDate }: DashboardProps) {
       <HabitWizard
         open={habitWizardOpen}
         onClose={() => setHabitWizardOpen(false)}
-        onSave={(draft) => addHabit(draft)}
+        onSave={(draft) => {
+          addHabit(draft)
+        }}
       />
     </div>
   )

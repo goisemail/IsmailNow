@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useHabitsStore } from '../store/habits'
+import { usePlansStore } from '../store/plans'
 import { useTasksStore } from '../store/tasks'
 import { useAuth } from '../contexts/AuthContext'
 import { useOnlineStatus } from './useOnlineStatus'
@@ -24,19 +25,26 @@ export function useDriveSync(): void {
   const flushToDrive = useTasksStore((state) => state.flushToDrive)
   const hasPendingTaskChanges = useTasksStore((state) => state.hasPendingChanges)
   const hasPendingHabitChanges = useHabitsStore((state) => state.hasPendingChanges)
+  const hasPendingPlanChanges = usePlansStore((state) => state.hasPendingChanges)
   const tasks = useTasksStore((state) => state.tasks)
   const habits = useHabitsStore((state) => state.habits)
   const habitEntries = useHabitsStore((state) => state.entries)
+  const plans = usePlansStore((state) => state.plans)
   const { canSync, getAccessToken, hasUsableAccessToken, reauthRequired } = useAuth()
   const isOnline = useOnlineStatus()
-  const previousRecordsRef = useRef({ tasks, habits, habitEntries })
+  const previousRecordsRef = useRef({ tasks, habits, habitEntries, plans })
 
   // Upload local mutations promptly without ever initiating OAuth in the background.
   useEffect(() => {
     const previous = previousRecordsRef.current
-    previousRecordsRef.current = { tasks, habits, habitEntries }
-    if (previous.tasks === tasks && previous.habits === habits && previous.habitEntries === habitEntries) return
-    if (!hasPendingTaskChanges() && !hasPendingHabitChanges()) return
+    previousRecordsRef.current = { tasks, habits, habitEntries, plans }
+    if (
+      previous.tasks === tasks &&
+      previous.habits === habits &&
+      previous.habitEntries === habitEntries &&
+      previous.plans === plans
+    ) return
+    if (!hasPendingTaskChanges() && !hasPendingHabitChanges() && !hasPendingPlanChanges()) return
 
     const timeoutId = window.setTimeout(() => {
       if (
@@ -45,19 +53,19 @@ export function useDriveSync(): void {
         navigator.onLine &&
         document.visibilityState === 'visible' &&
         hasUsableAccessToken() &&
-        (hasPendingTaskChanges() || hasPendingHabitChanges())
+        (hasPendingTaskChanges() || hasPendingHabitChanges() || hasPendingPlanChanges())
       ) {
         flushToDrive(getAccessToken).catch(console.error)
       }
     }, MUTATION_SYNC_DELAY_MS)
 
     return () => window.clearTimeout(timeoutId)
-  }, [canSync, flushToDrive, getAccessToken, habitEntries, habits, hasPendingHabitChanges, hasPendingTaskChanges, hasUsableAccessToken, reauthRequired, tasks])
+  }, [canSync, flushToDrive, getAccessToken, habitEntries, habits, hasPendingHabitChanges, hasPendingPlanChanges, hasPendingTaskChanges, hasUsableAccessToken, plans, reauthRequired, tasks])
 
   // ── Periodic flush + event listeners ────────────────────────────────────────
   useEffect(() => {
     const flush = (pendingOnly = false) => {
-      const hasPendingChanges = hasPendingTaskChanges() || hasPendingHabitChanges()
+      const hasPendingChanges = hasPendingTaskChanges() || hasPendingHabitChanges() || hasPendingPlanChanges()
       if (
         canSync &&
         !reauthRequired &&
@@ -83,7 +91,7 @@ export function useDriveSync(): void {
       clearInterval(intervalId)
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [canSync, flushToDrive, getAccessToken, hasPendingHabitChanges, hasPendingTaskChanges, hasUsableAccessToken, reauthRequired])
+  }, [canSync, flushToDrive, getAccessToken, hasPendingHabitChanges, hasPendingPlanChanges, hasPendingTaskChanges, hasUsableAccessToken, reauthRequired])
 
   // ── Flush immediately when network comes back online ─────────────────────────
   useEffect(() => {

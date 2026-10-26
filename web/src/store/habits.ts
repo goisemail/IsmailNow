@@ -86,7 +86,7 @@ interface HabitsStore {
   hasVolatileChanges: () => boolean
   retryPersistence: () => boolean
   applySyncResult: (habits: Habit[], entries?: HabitEntry[]) => void
-  addHabit: (habit: HabitDraft) => void
+  addHabit: (habit: HabitDraft) => string
   updateHabit: (id: string, patch: Partial<HabitDraft>) => void
   logCompletion: (id: string, date?: string) => void
   setEntryState: (id: string, date: string, state: HabitEntryState, value?: number) => void
@@ -355,8 +355,9 @@ export const useHabitsStore = create<HabitsStore>((set, get) => {
 
     addHabit: (draft) => {
       const now = new Date().toISOString()
+      const id = generateId()
       const habit: Habit = normalizeHabit({
-        id: generateId(),
+        id,
         name: draft.name,
         description: draft.description,
         color: draft.color,
@@ -371,6 +372,7 @@ export const useHabitsStore = create<HabitsStore>((set, get) => {
         synced: false,
       } as Habit)
       commit([...get().habits, habit], get().entries)
+      return habit.id
     },
 
     updateHabit: (id, patch) => {

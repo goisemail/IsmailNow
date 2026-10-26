@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Home, BookOpen, CheckSquare, Calendar, Settings, LayoutGrid } from 'lucide-react'
+import { Home, BookOpen, CheckSquare, Settings, LayoutGrid } from 'lucide-react'
 import './Navigation.css'
 
 export default function Navigation() {
@@ -49,7 +49,7 @@ export default function Navigation() {
         <span className="nav-label">Planner</span>
       </Link>
 
-      <Link
+      {/* <Link
         to="/history"
         className={`nav-icon ${isActive('/history') ? 'active' : ''}`}
         title="History"
@@ -57,7 +57,7 @@ export default function Navigation() {
       >
         <Calendar size={24} />
         <span className="nav-label">History</span>
-      </Link>
+      </Link> */}
 
       <Link
         to="/settings"

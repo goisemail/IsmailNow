@@ -19,6 +19,7 @@ vi.mock('../lib/googleDrive', () => {
 
 import { mergeTasks, useTasksStore, type PendingTask } from './tasks'
 import { todayLocal, useHabitsStore } from './habits'
+import { taskVisibleOnDate } from './tasks'
 
 describe('task synchronization coordinator', () => {
   beforeEach(async () => {
@@ -135,5 +136,39 @@ describe('task synchronization coordinator', () => {
     expect(useTasksStore.getState().tasks).toHaveLength(1)
     expect(useTasksStore.getState().hasVolatileChanges()).toBe(true)
     expect(useTasksStore.getState().retryPersistence()).toBe(false)
+  })
+})
+
+describe('taskVisibleOnDate', () => {
+  const task = (completedDate?: string): PendingTask => ({
+    id: 'task-1',
+    title: 'Pending task',
+    startDate: '2026-07-28',
+    createdAt: '2026-07-28T00:00:00.000Z',
+    updatedAt: '2026-07-28T00:00:00.000Z',
+    synced: true,
+    ...(completedDate !== undefined ? { completedDate } : {}),
+  })
+
+  it('does not show a task before its start date', () => {
+    expect(taskVisibleOnDate(task(), '2026-07-27')).toBe(false)
+  })
+
+  it('shows a pending task from its start date onward', () => {
+    expect(taskVisibleOnDate(task(), '2026-07-28')).toBe(true)
+    expect(taskVisibleOnDate(task(), '2026-07-29')).toBe(true)
+    expect(taskVisibleOnDate(task(), '2026-07-30')).toBe(true)
+  })
+
+  it('hides a completed task after its completion date', () => {
+    const completedTask = task('2026-07-29')
+    expect(taskVisibleOnDate(completedTask, '2026-07-29')).toBe(true)
+    expect(taskVisibleOnDate(completedTask, '2026-07-30')).toBe(false)
+  })
+
+  it('never shows a deleted task', () => {
+    const deletedTask = task()
+    deletedTask.isDeleted = true
+    expect(taskVisibleOnDate(deletedTask, '2026-07-28')).toBe(false)
   })
 })

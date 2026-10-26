@@ -1,4 +1,4 @@
-export type StorageCollection = 'tasks' | 'habits' | 'habitEntries'
+export type StorageCollection = 'tasks' | 'habits' | 'habitEntries' | 'plans' | 'plannerSettings'
 
 const LEGACY_KEYS: Partial<Record<StorageCollection, string>> = {
   tasks: 'ismailnow_tasks_v1',

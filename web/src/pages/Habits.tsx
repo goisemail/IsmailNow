@@ -13,7 +13,7 @@ import {
   type HabitEntry,
   type HabitStats,
 } from '../store/habits'
-import { BarChart3, Edit2, Trash2 } from 'lucide-react'
+import { BarChart3, Edit2, Plus, Trash2 } from 'lucide-react'
 import HabitWizard from '../components/HabitWizard'
 import HabitStateControl from '../components/HabitStateControl'
 import './Habits.css'
@@ -48,6 +48,15 @@ export default function Habits() {
     <div className="habits-page container-lg py-4">
       <div className="mb-4">
         <h1 className="h3 mb-0">Habits</h1>
+        <button
+          className="fab"
+          type="button"
+          onClick={() => { setEditingHabit(null); setWizardOpen(true) }}
+          aria-label="Add habit"
+          data-testid="add-habit-btn"
+        >
+          <Plus size={34} />
+        </button>
       </div>
 
       {habits.length === 0 ? (
