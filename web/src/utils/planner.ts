@@ -4,6 +4,7 @@ import type { PendingPlan } from '../store/plans'
 
 export interface PlannerEvent {
   id: string
+  plannedId: string
   title: string
   start: Date
   end: Date
@@ -33,6 +34,7 @@ export function buildEvent(plan: PendingPlan, dateKey: string): PlannerEvent {
   end.setHours(endHour, endMinute, 0, 0)
   return {
     id: `${plan.id}:${dateKey}`,
+    plannedId: plan.id,
     title: plan.title,
     start,
     end,

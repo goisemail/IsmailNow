@@ -18,6 +18,7 @@ import {
 } from '../store/habits'
 import { mergeTasks, useTasksStore, type PendingTask } from '../store/tasks'
 import { mergePlans, usePlansStore, type PendingPlan } from '../store/plans'
+import { useSettingsStore } from '../store/settings'
 
 export interface AppUser {
   uid: string
@@ -122,12 +123,14 @@ function activateLocalAccount(profile: AppUser): void {
   useTasksStore.getState().load(ownerId)
   void useHabitsStore.getState().load(ownerId)
   usePlansStore.getState().load(ownerId)
+  useSettingsStore.getState().load(ownerId)
 }
 
 function clearActiveAccount(): void {
   useTasksStore.getState().clearMemory()
   useHabitsStore.getState().clearMemory()
   usePlansStore.getState().clearMemory()
+  useSettingsStore.getState().clearMemory()
   clearDriveCache()
 }
 

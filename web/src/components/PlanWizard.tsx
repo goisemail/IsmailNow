@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import type { HabitDraft } from '../store/habits'
 import { useHabitsStore } from '../store/habits'
 import { usePlansStore } from '../store/plans'
+import type { PendingPlan } from '../store/plans'
 import { useTasksStore } from '../store/tasks'
 import { planOccurrenceDates } from '../utils/planner'
 import HabitWizard from './HabitWizard'
@@ -12,6 +13,9 @@ interface PlanWizardProps {
   open: boolean
   onClose: () => void
   defaultDate: string
+  defaultStartTime?: string
+  defaultEndTime?: string
+  planToEdit?: PendingPlan
 }
 
 type WizardPhase = 'plan' | 'habit'
@@ -29,7 +33,14 @@ const WEEKDAY_OPTIONS = [
   { day: 0, label: 'S' },
 ]
 
-export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardProps) {
+export default function PlanWizard({
+  open,
+  onClose,
+  defaultDate,
+  defaultStartTime,
+  defaultEndTime,
+  planToEdit,
+}: PlanWizardProps) {
   const [title, setTitle] = useState('')
   const [day, setDay] = useState(defaultDate)
   const [startTime, setStartTime] = useState(DEFAULT_START)
@@ -47,20 +58,29 @@ export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardPro
   useEffect(() => {
     if (!open) return
     setPhase('plan')
-    setPlanId(null)
     setShowErrors(false)
-    setTitle('')
-    setDay(defaultDate)
-    setStartTime(DEFAULT_START)
-    setEndTime(DEFAULT_END)
-    setIsRepeating(false)
-    setRepeatDays(ALL_WEEKDAYS)
-    setRepeatEndDate('')
-    setAddAsTask(false)
-    setAddAsHabit(false)
+    if (planToEdit) {
+      setPlanId(planToEdit.id)
+      setTitle(planToEdit.title)
+      setDay(planToEdit.startDate)
+      setStartTime(planToEdit.startTime)
+      setEndTime(planToEdit.endTime)
+      setIsRepeating(planToEdit.isRepeating === true)
+      setRepeatDays(planToEdit.repeatDays ?? ALL_WEEKDAYS)
+      setRepeatEndDate(planToEdit.endDate ?? '')
+    } else {
+      setPlanId(null)
+      setTitle('')
+      setDay(defaultDate)
+      setStartTime(defaultStartTime ?? DEFAULT_START)
+      setEndTime(defaultEndTime ?? DEFAULT_END)
+      setIsRepeating(false)
+      setRepeatDays(ALL_WEEKDAYS)
+      setRepeatEndDate('')
+    }
     const timer = window.setTimeout(() => inputRef.current?.focus(), 50)
     return () => window.clearTimeout(timer)
-  }, [open, defaultDate])
+  }, [open, planToEdit, defaultDate, defaultStartTime, defaultEndTime])
 
   useEffect(() => {
     if (!open || phase !== 'plan') return
@@ -91,7 +111,22 @@ export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardPro
     if (!formValid) return
 
     const planTitle = title.trim()
-    const id = usePlansStore.getState().addPlan({
+
+    if (planId) {
+      usePlansStore.getState().updatePlan(planId, {
+        title: planTitle,
+        startDate: day,
+        startTime,
+        endTime,
+        endDate: isRepeating ? repeatEndDate : null,
+        isRepeating,
+        repeatDays: isRepeating ? repeatDays : null,
+      })
+      resetAndClose()
+      return
+    }
+
+    const newPlanId = usePlansStore.getState().addPlan({
       title: planTitle,
       startDate: day,
       startTime,
@@ -100,16 +135,16 @@ export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardPro
       isRepeating,
       repeatDays: isRepeating ? repeatDays : null,
     })
-    setPlanId(id)
+    setPlanId(newPlanId)
 
     if (addAsTask) {
-      const createdPlan = usePlansStore.getState().plans.find((plan) => plan.id === id)
+      const createdPlan = usePlansStore.getState().plans.find((plan) => plan.id === newPlanId)
       const occurrenceDates = createdPlan ? planOccurrenceDates(createdPlan) : [day]
       const taskIds: string[] = []
       for (const occurrenceDate of occurrenceDates) {
         taskIds.push(await useTasksStore.getState().addTask(planTitle, occurrenceDate))
       }
-      usePlansStore.getState().updatePlanLinks(id, { linkedTaskIds: taskIds })
+      usePlansStore.getState().updatePlan(newPlanId, { linkedTaskIds: taskIds })
     }
 
     if (addAsHabit) setPhase('habit')
@@ -118,7 +153,12 @@ export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardPro
 
   const handleHabitSaved = (draft: HabitDraft) => {
     const habitId = useHabitsStore.getState().addHabit(draft)
-    if (planId) usePlansStore.getState().updatePlanLinks(planId, { linkedHabitId: habitId })
+    if (planId) usePlansStore.getState().updatePlan(planId, { linkedHabitId: habitId })
+    resetAndClose()
+  }
+
+  const handleDelete = () => {
+    if (planId) usePlansStore.getState().deletePlan(planId)
     resetAndClose()
   }
 
@@ -284,6 +324,16 @@ export default function PlanWizard({ open, onClose, defaultDate }: PlanWizardPro
             >
               Cancel
             </button>
+            {planToEdit && (
+              <button
+                type="button"
+                className="plan-delete-btn"
+                onClick={handleDelete}
+                data-testid="planWizardDelete"
+              >
+                Delete
+              </button>
+            )}
             <button
               type="submit"
               className="task-wizard-btn task-wizard-btn--ok"

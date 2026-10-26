@@ -49,7 +49,7 @@ export default function Navigation() {
         <span className="nav-label">Planner</span>
       </Link>
 
-      <Link
+      {/* <Link
         to="/history"
         className={`nav-icon ${isActive('/history') ? 'active' : ''}`}
         title="History"
@@ -57,7 +57,7 @@ export default function Navigation() {
       >
         <Calendar size={24} />
         <span className="nav-label">History</span>
-      </Link>
+      </Link> */}
 
       <Link
         to="/settings"

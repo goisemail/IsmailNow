@@ -42,7 +42,8 @@ interface PlansStore {
   hasVolatileChanges: () => boolean
   retryPersistence: () => boolean
   addPlan: (draft: PlanDraft) => string
-  updatePlanLinks: (id: string, links: { linkedTaskId?: string | null; linkedTaskIds?: string[] | null; linkedHabitId?: string | null }) => void
+  updatePlan: (id: string, patch: Partial<Omit<PendingPlan, 'id'>>) => void
+  deletePlan: (id: string) => void
   applySyncResult: (plans: PendingPlan[]) => void
 }
 
@@ -182,19 +183,45 @@ export const usePlansStore = create<PlansStore>((set, get) => {
       return id
     },
 
-  updatePlanLinks: (id, links) => {
-    const ownerId = get().ownerId
-    if (!ownerId) return
-    const plans = get().plans.map((plan) => plan.id === id
-      ? {
-        ...plan,
-        ...(links.linkedTaskId !== undefined ? { linkedTaskId: links.linkedTaskId } : {}),
-        ...(links.linkedTaskIds !== undefined ? { linkedTaskIds: links.linkedTaskIds } : {}),
-        ...(links.linkedHabitId !== undefined ? { linkedHabitId: links.linkedHabitId } : {}),
-        updatedAt: new Date().toISOString(),
-        synced: false,
-      }
-      : plan)
+    updatePlanLinks: (id: string, links: { linkedTaskId?: string | null; linkedTaskIds?: string[] | null; linkedHabitId?: string | null }) => {
+      const ownerId = get().ownerId
+      if (!ownerId) return
+      const plans = get().plans.map((plan) => plan.id === id
+        ? {
+          ...plan,
+          ...(links.linkedTaskId !== undefined ? { linkedTaskId: links.linkedTaskId } : {}),
+          ...(links.linkedTaskIds !== undefined ? { linkedTaskIds: links.linkedTaskIds } : {}),
+          ...(links.linkedHabitId !== undefined ? { linkedHabitId: links.linkedHabitId } : {}),
+          updatedAt: new Date().toISOString(),
+          synced: false,
+        }
+        : plan)
+      const persisted = persist(ownerId, plans)
+      set({
+        plans,
+        volatile: !persisted,
+        error: persisted ? null : 'Changes could not be saved in this browser.',
+      })
+    },
+
+    updatePlan: (id: string, patch: Partial<Omit<PendingPlan, 'id'>>) => {
+      const ownerId = get().ownerId
+      if (!ownerId) return
+      const plans = get().plans.map((plan) => plan.id === id
+        ? { ...plan, ...patch, updatedAt: new Date().toISOString(), synced: false }
+        : plan)
+      const persisted = persist(ownerId, plans)
+      set({
+        plans,
+        volatile: !persisted,
+        error: persisted ? null : 'Changes could not be saved in this browser.',
+      })
+    },
+
+    deletePlan: (id: string) => {
+      const ownerId = get().ownerId
+      if (!ownerId) return
+      const plans = get().plans.filter((plan) => plan.id !== id)
       const persisted = persist(ownerId, plans)
       set({
         plans,

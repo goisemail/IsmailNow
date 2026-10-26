@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useHabitsStore } from '../store/habits'
 import { useTasksStore } from '../store/tasks'
+import { useSettingsStore } from '../store/settings'
 import { useAuth } from '../contexts/AuthContext'
 import { Trash2 } from 'lucide-react'
 import { listDriveBackups, type DriveBackup } from '../lib/googleDrive'
@@ -13,6 +14,8 @@ export default function Settings() {
   const deleteTask = useTasksStore((state) => state.deleteTask)
   const restoreBackup = useTasksStore((state) => state.restoreBackup)
   const { canSync, getAccessToken, hasUsableAccessToken, reauthRequired } = useAuth()
+  const defaultPlannerView = useSettingsStore((state) => state.defaultPlannerView)
+  const setDefaultPlannerView = useSettingsStore((state) => state.setDefaultPlannerView)
 
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [backups, setBackups] = useState<DriveBackup[]>([])
@@ -61,6 +64,27 @@ export default function Settings() {
     <div className="container py-4">
       <h1 className="h3 mb-4">Settings</h1>
 
+      {/* Manage Settings */}
+      <div className="card mb-4">
+        <div className="card-header bg-light">
+          <h5 className="mb-0">Planner Settings</h5>
+        </div>
+        <div className="card-body">
+          <div className="mb-3">
+            <label className="form-label">Default Planner View</label>
+            <select
+              className="form-select"
+              value={defaultPlannerView}
+              onChange={(e) => setDefaultPlannerView(e.target.value as 'day' | 'week' | 'month')}
+            >
+              <option value="day">Day</option>
+              <option value="week">Week</option>
+              <option value="month">Month</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      
       {/* Data Management */}
       <div className="card mb-4">
         <div className="card-header bg-light">
@@ -133,7 +157,7 @@ export default function Settings() {
       </div>
 
       {/* Manage Tasks */}
-      <div className="card">
+      <div className="card mb-4">
         <div className="card-header bg-light">
           <h5 className="mb-0">Manage Tasks ({visibleTasks.length})</h5>
         </div>
@@ -163,9 +187,8 @@ export default function Settings() {
         </div>
       </div>
 
-      <p className="text-muted mt-4 text-center small">
-        🔧 More settings coming soon...
-      </p>
+
+
     </div>
   )
 }

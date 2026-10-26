@@ -1,7 +1,7 @@
 .plan-wizard-time-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 8px;
 }
 
 .plan-wizard-checkbox {
@@ -111,7 +111,73 @@
     border-top-color: #495057;
   }
 
+  .plan-delete-btn {
+    color: #ffffff;
+    background: #dc3545;
+    border: none;
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+  }
+
+  .plan-delete-btn:hover {
+    background: #c82333;
+  }
+
   .plan-wizard-error {
     color: #ff6b81;
+  }
+}
+
+.plan-delete-btn {
+  color: #ffffff;
+  background: #dc3545;
+  border: none;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.plan-delete-btn:hover {
+  background: #c82333;
+}
+
+@media (prefers-color-scheme: dark) {
+  .plan-delete-btn {
+    background: #dc3545;
+  }
+
+  .plan-delete-btn:hover {
+    background: #c82333;
+  }
+}
+
+.planner-time-row input[type="date"],
+.planner-time-row input[type="time"] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+@media (max-width: 576px) {
+  .planner-time-row {
+    gap: 6px;
+  }
+
+  .planner-time-row input[type="date"],
+  .planner-time-row input[type="time"] {
+    font-size: 0.875rem;
+    padding: 10px 10px;
+  }
+
+  .plan-wizard-label {
+    font-size: 0.875rem;
   }
 }

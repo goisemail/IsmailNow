@@ -114,7 +114,7 @@ Implemented reusing `TaskWizard` conventions (overlay click + Escape close, them
 ### Phase 4: Plans Store + Drive Sync (store/plans.ts, lib/googleDrive.ts) — DONE (step 4)
 A plan exists independently of tasks/habits, so it has its own store (modeled on `store/tasks.ts`):
 - `PendingPlan` interface: `{ id, title, startDate, startTime, endTime, endDate, isRepeating, repeatDays, linkedTaskId?, linkedTaskIds?, linkedHabitId?, createdAt, updatedAt, synced }` — `repeatDays` is `number[] | null` (weekday indices `0=Sun…6=Sat`; `null`/empty = daily); `linkedTaskIds` holds one id per created task occurrence
-- Store actions: `addPlan` (returns id), `updatePlanLinks`, `load`, `applySyncResult`, volatile/pending handling, `accountStorageKey('…','plans')` persistence
+- Store actions: `addPlan` (returns id), `updatePlan`, `deletePlan`, `load`, `applySyncResult`, volatile/pending handling, `accountStorageKey('…','plans')` persistence
 - `lib/googleDrive.ts` extended: new `parsePlans` (whitelist-rebuild with validation), `createDocument`/`canonicalData` include plans, schema bumped to v4 (v2/v3 files still accepted), `loadTasksFromDrive` / `saveTasksToDrive` / `restoreDriveBackup` round-trip plans
 - Tasks store `syncOnce` merges + reconciles plans alongside habits; `useDriveSync` triggers flushes on plan mutations
 - `addTask` / `addHabit` now return the created id (used for linking); existing callers unaffected
@@ -125,21 +125,21 @@ A plan exists independently of tasks/habits, so it has its own store (modeled on
 Colocated vitest tests following repo conventions:
 - `Planner` event mapping: plans plotted at real times, no fabricated positions
 - Recurrence expansion: one repeating plan → one event per day in range
-- Plans store: `addPlan` persists new fields; plans load/persist correctly
+- Plans store: `addPlan` persists new fields; plans load/persist correctly; `updatePlan` / `deletePlan` work
 - `googleDrive`: plans parse + canonical round-trip all fields
-- `PlanWizard` validation: end time > start time; repeat end date >= day; chaining opens TaskWizard then HabitWizard
+- `PlanWizard` validation: end time > start time; repeat end date >= day; chaining opens TaskWizard then HabitWizard; edit prefill + delete plan
 
 Implemented: `store/plans.test.ts` (persist/relay/link/merge), `components/PlanWizard.test.tsx` (validation, chaining, cancel-keeps-plan, both-checkbox order), `lib/googleDrive.test.ts` extended (schema v4, plan round-trip, malformed-plan rejection, plan upload verification), `useDriveSync.test.tsx` extended (plan mutation flush).
 
 ## Verification Checklist
 - [x] Theme matches other tabs (light + dark)
 - [x] Single Day/Week/Month switcher; nav buttons work
-- [x] + button opens PlanWizard with all fields
-- [x] Plan appears at its real time on the calendar
+- [x] Edit existing plan from calendar — prefilled modal opens; save updates dates/title/repeat
+- [x] Delete plan from edit mode — red Delete button removes plan
 - [x] Repeating plan appears on every day through its end date
 - [x] Weekday repeat: all 7 circles default-selected; picking only Sat/Sun allocates time only on those days
 - [x] Task checkbox → one task per planned occurrence, visible in Tasks tab and Home (instant, no wizard); pending tasks show from their startDate onward and pile up day by day until completed
 - [x] Habit checkbox → habit created, visible in Habits tab and Home
 - [x] Both checkboxes → task created instantly, habit wizard follows; cancel keeps plan + task
 - [x] Plans survive reload and Drive sync on a second device (schema v4 with plan parse/canonical coverage)
-- [x] No TypeScript errors / lint errors; `npm test` passes (75 tests)
+- [x] No TypeScript errors / lint errors; `npm test` passes (82 tests)

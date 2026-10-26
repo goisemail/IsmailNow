@@ -45,12 +45,13 @@ export default function Habits() {
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1 className="h3 mb-0">Habits</h1>
         <button
-          className="btn btn-primary btn-sm d-flex align-items-center gap-1"
+          className="fab"
+          type="button"
           onClick={() => { setEditingHabit(null); setWizardOpen(true) }}
+          aria-label="Add habit"
           data-testid="add-habit-btn"
         >
-          <Plus size={16} />
-          Add Habit
+          <Plus size={34} />
         </button>
       </div>
 

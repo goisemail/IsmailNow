@@ -100,7 +100,7 @@ describe('plans store', () => {
       endTime: '19:00',
     })
 
-    usePlansStore.getState().updatePlanLinks(id, { linkedTaskId: 'task-42' })
+    usePlansStore.getState().updatePlan(id, { linkedTaskId: 'task-42' })
 
     expect(usePlansStore.getState().plans[0]).toMatchObject({
       linkedTaskId: 'task-42',
@@ -116,7 +116,7 @@ describe('plans store', () => {
       endTime: '19:00',
     })
 
-    usePlansStore.getState().updatePlanLinks(id, { linkedTaskIds: ['task-1', 'task-2'] })
+    usePlansStore.getState().updatePlan(id, { linkedTaskIds: ['task-1', 'task-2'] })
 
     expect(usePlansStore.getState().plans[0]).toMatchObject({
       linkedTaskIds: ['task-1', 'task-2'],

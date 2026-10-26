@@ -180,4 +180,61 @@ describe('PlanWizard', () => {
     expect(useTasksStore.getState().tasks.map((task) => task.title)).toEqual(['Evening block'])
     expect(screen.queryByTestId('taskWizardInput')).not.toBeInTheDocument()
   })
+
+  it('prefills the wizard from an existing plan', async () => {
+    const id = usePlansStore.getState().addPlan({
+      title: 'Morning walk',
+      startDate: '2026-10-16',
+      startTime: '09:00',
+      endTime: '10:00',
+      isRepeating: true,
+      repeatDays: [1, 5],
+      endDate: '2026-10-31',
+    })
+
+    render(<PlanWizard open onClose={vi.fn()} defaultDate="2026-10-15" planToEdit={usePlansStore.getState().plans.find((p) => p.id === id)!} />)
+
+    expect(screen.getByTestId('planWizardName')).toHaveValue('Morning walk')
+    expect(screen.getByTestId('planWizardDay')).toHaveValue('2026-10-16')
+    expect(screen.getByTestId('planWizardStart')).toHaveValue('09:00')
+    expect(screen.getByTestId('planWizardEnd')).toHaveValue('10:00')
+    expect(screen.getByTestId('planWizardRepeat')).toBeChecked()
+    expect(screen.getByTestId('planWizardDay-1')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('planWizardDay-5')).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('updates an existing plan when saved from edit mode', async () => {
+    const id = usePlansStore.getState().addPlan({
+      title: 'Morning walk',
+      startDate: '2026-10-16',
+      startTime: '09:00',
+      endTime: '10:00',
+    })
+
+    render(<PlanWizard open onClose={vi.fn()} defaultDate="2026-10-15" planToEdit={usePlansStore.getState().plans.find((p) => p.id === id)!} />)
+
+    await userEvent.clear(screen.getByTestId('planWizardName'))
+    await userEvent.type(screen.getByTestId('planWizardName'), 'Evening walk')
+    fireEvent.change(screen.getByTestId('planWizardStart'), { target: { value: '18:00' } })
+    fireEvent.change(screen.getByTestId('planWizardEnd'), { target: { value: '19:00' } })
+    await userEvent.click(screen.getByTestId('planWizardSave'))
+
+    await waitFor(() => expect(usePlansStore.getState().plans[0].title).toBe('Evening walk'))
+    expect(usePlansStore.getState().plans[0].startTime).toBe('18:00')
+    expect(usePlansStore.getState().plans[0].synced).toBe(false)
+  })
+
+  it('deletes a plan from edit mode', async () => {
+    const id = usePlansStore.getState().addPlan({
+      title: 'To delete',
+      startDate: '2026-10-16',
+      startTime: '09:00',
+      endTime: '10:00',
+    })
+
+    render(<PlanWizard open onClose={vi.fn()} defaultDate="2026-10-15" planToEdit={usePlansStore.getState().plans.find((p) => p.id === id)!} />)
+
+    await userEvent.click(screen.getByTestId('planWizardDelete'))
+    expect(usePlansStore.getState().plans).toHaveLength(0)
+  })
 })
