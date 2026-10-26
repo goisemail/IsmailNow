@@ -1,0 +1,103 @@
+/* Settings page theme - matches app dark palette */
+
+.settings-page {
+  color: #f8f9fa;
+}
+
+.settings-page .card {
+  background: #2b3035;
+  border: 1px solid #495057;
+  color: #f8f9fa;
+}
+
+.settings-page .card-header {
+  background: #343a40;
+  border-bottom: 1px solid #495057;
+  color: #f8f9fa;
+}
+
+.settings-page .card-body {
+  background: #2b3035;
+  color: #f8f9fa;
+}
+
+.bg-light{
+  background: #343a40 !important;
+  color: #f8f9fa !important;
+}
+.mb-0 {
+  color: #E72372;
+}
+
+.settings-page .form-label {
+  color: #f8f9fa;
+  font-weight: 600;
+}
+
+.settings-page .form-select,
+.settings-page .form-control {
+  background: #2d2d3a;
+  border: 1px solid #495057;
+  color: #f8f9fa;
+}
+
+.settings-page .form-select:focus,
+.settings-page .form-control:focus {
+  border-color: #E72372;
+  box-shadow: 0 0 0 0.2rem rgba(231, 35, 114, 0.25);
+  color: #f8f9fa;
+}
+
+.settings-page .list-group-item {
+  background: #2b3035;
+  border: 1px solid #495057;
+  color: #f8f9fa;
+}
+
+.settings-page .list-group-item:hover {
+  background: #343a40;
+}
+
+.settings-page .btn.btn-primary {
+  background: #E72372;
+  border-color: #E72372;
+  color: #ffffff;
+}
+
+.settings-page .btn.btn-primary:hover {
+  background: #c2185b;
+  border-color: #c2185b;
+}
+
+.settings-page .btn.btn-danger {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: #ffffff;
+}
+
+.settings-page .btn.btn-danger:hover {
+  background: #bb2d3b;
+  border-color: #bb2d3b;
+}
+
+.settings-page .text-muted {
+  color: #adb5bd !important;
+}
+
+.settings-page .h1,
+.settings-page .h3,
+.settings-page .h5 {
+  color: #f8f9fa;
+}
+
+.settings-page .alert {
+  background: #343a40;
+  border: 1px solid #495057;
+  color: #f8f9fa;
+}
+
+.settings-page .alert-warning {
+  background: rgba(231, 35, 114, 0.15);
+  border: 1px solid #E72372;
+  color: #f8f9fa;
+}

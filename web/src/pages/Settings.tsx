@@ -5,6 +5,7 @@ import { useSettingsStore } from '../store/settings'
 import { useAuth } from '../contexts/AuthContext'
 import { Trash2 } from 'lucide-react'
 import { listDriveBackups, type DriveBackup } from '../lib/googleDrive'
+import './Settings.css'
 
 export default function Settings() {
   const allHabits = useHabitsStore((state) => state.habits)
@@ -61,7 +62,7 @@ export default function Settings() {
   const visibleTasks = tasks.filter((t) => !t.isDeleted)
 
   return (
-    <div className="container py-4">
+    <div className="settings-page container py-4">
       <h1 className="h3 mb-4">Settings</h1>
 
       {/* Manage Settings */}
@@ -84,7 +85,7 @@ export default function Settings() {
           </div>
         </div>
       </div>
-      
+
       {/* Data Management */}
       <div className="card mb-4">
         <div className="card-header bg-light">
