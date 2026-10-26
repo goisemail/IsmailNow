@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTasksStore, taskVisibleOnDate, PendingTask } from '../store/tasks'
 import { useAuth } from '../contexts/AuthContext'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { formatDate } from '../utils/date'
 import { getContrastingAccentColor } from '../utils/color'
 import TaskWizard from '../components/TaskWizard'
@@ -141,7 +141,7 @@ export default function Tasks() {
         aria-label="Add task"
         data-testid="add-task-fab"
       >
-        +
+        <Plus size={34} />
       </button>
 
       <TaskWizard

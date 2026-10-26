@@ -12,6 +12,7 @@ import { usePlansStore } from '../store/plans'
 import { useSettingsStore } from '../store/settings'
 import { buildEvent, planOccurrenceDates, type PlannerEvent } from '../utils/planner'
 import './Planner.css'
+import { Plus } from 'lucide-react'
 
 const locales = { 'en-US': enUS }
 const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales })
@@ -89,7 +90,7 @@ export default function Planner() {
         aria-label="Plan your time"
         data-testid="planner-fab"
       >
-        +
+        <Plus size={34} />
       </button>
 
       <PlanWizard
