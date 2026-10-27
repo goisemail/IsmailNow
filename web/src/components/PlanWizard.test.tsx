@@ -235,6 +235,9 @@ describe('PlanWizard', () => {
     render(<PlanWizard open onClose={vi.fn()} defaultDate="2026-10-15" planToEdit={usePlansStore.getState().plans.find((p) => p.id === id)!} />)
 
     await userEvent.click(screen.getByTestId('planWizardDelete'))
-    expect(usePlansStore.getState().plans).toHaveLength(0)
+    const plans = usePlansStore.getState().plans
+    expect(plans).toHaveLength(1)
+    expect(plans[0].isDeleted).toBe(true)
+    expect(plans[0].synced).toBe(false)
   })
 })

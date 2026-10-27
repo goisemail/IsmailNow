@@ -5,6 +5,7 @@ import parse from 'date-fns/parse'
 import startOfWeek from 'date-fns/startOfWeek'
 import getDay from 'date-fns/getDay'
 import { enUS } from 'date-fns/locale'
+import type { Locale } from 'date-fns'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import PlannerToolbar from '../components/PlannerToolbar'
 import PlanWizard from '../components/PlanWizard'
@@ -15,7 +16,17 @@ import './Planner.css'
 import { Plus } from 'lucide-react'
 
 const locales = { 'en-US': enUS }
-const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales })
+
+const formatWithShortWeekday = (date: Date, formatStr: string, locale?: { locale?: Locale }) => {
+  const resolvedLocale = locale?.locale ?? enUS
+  // react-big-calendar renders full weekday names (e.g. "Tuesday") via the
+  // 'cccc' token in day headers; collapse those to the 3-letter form so
+  // headers read "Tue" instead of "Tuesday".
+  const shortFormat = formatStr.replace(/cccc/g, 'ccc')
+  return format(date, shortFormat, { locale: resolvedLocale })
+}
+
+const localizer = dateFnsLocalizer({ format: formatWithShortWeekday, parse, startOfWeek, getDay, locales })
 
 const LINKED_TASK_COLOR = '#0D6EFD'
 const LINKED_HABIT_COLOR = '#6F42C1'
@@ -31,9 +42,11 @@ export default function Planner() {
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null)
   const [wizardDraft, setWizardDraft] = useState<{ date: string; startTime: string; endTime: string } | null>(null)
 
+  const activePlans = plans.filter((plan) => !plan.isDeleted)
+
   const plannerEvents = useMemo(
-    () => plans.flatMap((plan) => planOccurrenceDates(plan).map((dateKey) => buildEvent(plan, dateKey))),
-    [plans],
+    () => activePlans.flatMap((plan) => planOccurrenceDates(plan).map((dateKey) => buildEvent(plan, dateKey))),
+    [activePlans],
   )
 
   const eventPropGetter = (event: PlannerEvent) => {
@@ -100,7 +113,7 @@ export default function Planner() {
           setEditingPlanId(null)
           setWizardDraft(null)
         }}
-        planToEdit={editingPlanId ? plans.find((p) => p.id === editingPlanId) : undefined}
+        planToEdit={editingPlanId ? activePlans.find((p) => p.id === editingPlanId) : undefined}
         defaultDate={wizardDraft?.date ?? format(viewDate, 'yyyy-MM-dd')}
         defaultStartTime={wizardDraft?.startTime ?? DEFAULT_START}
         defaultEndTime={wizardDraft?.endTime ?? DEFAULT_END}

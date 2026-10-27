@@ -16,6 +16,8 @@ export interface PendingPlan {
   createdAt: string
   updatedAt: string
   synced: boolean
+  isDeleted?: boolean
+  deletedAt?: string | null
 }
 
 export interface PlanDraft {
@@ -84,6 +86,8 @@ export function normalizePlan(plan: PendingPlan): PendingPlan {
     linkedTaskIds: normalizeTaskIds(plan.linkedTaskIds),
     linkedHabitId: plan.linkedHabitId ?? null,
     synced: plan.synced !== false,
+    isDeleted: plan.isDeleted === true,
+    deletedAt: plan.deletedAt ?? null,
   }
 }
 
@@ -221,7 +225,10 @@ export const usePlansStore = create<PlansStore>((set, get) => {
     deletePlan: (id: string) => {
       const ownerId = get().ownerId
       if (!ownerId) return
-      const plans = get().plans.filter((plan) => plan.id !== id)
+      const now = new Date().toISOString()
+      const plans = get().plans.map((plan) => plan.id === id
+        ? { ...plan, isDeleted: true, deletedAt: now, updatedAt: now, synced: false }
+        : plan)
       const persisted = persist(ownerId, plans)
       set({
         plans,

@@ -231,6 +231,8 @@ function parsePlans(candidates: unknown[]): PendingPlan[] {
       linkedHabitId: typeof raw.linkedHabitId === 'string' ? raw.linkedHabitId : null,
       createdAt,
       updatedAt,
+      isDeleted: raw.isDeleted === true,
+      deletedAt: typeof raw.deletedAt === 'string' && raw.deletedAt.trim() ? raw.deletedAt : null,
       synced: true,
     }
   })
@@ -434,6 +436,8 @@ function canonicalData(tasks: PendingTask[], habits: Habit[], habitEntries: Habi
         linkedTaskId: plan.linkedTaskId ?? null,
         linkedTaskIds: plan.linkedTaskIds ?? null,
         linkedHabitId: plan.linkedHabitId ?? null,
+        isDeleted: plan.isDeleted === true,
+        deletedAt: plan.deletedAt ?? null,
         createdAt: plan.createdAt,
         updatedAt: plan.updatedAt,
       })),

@@ -15,11 +15,22 @@ import parse from 'date-fns/parse'
 import startOfWeek from 'date-fns/startOfWeek'
 import getDay from 'date-fns/getDay'
 import { enUS } from 'date-fns/locale'
+import type { Locale } from 'date-fns'
 import 'react-big-calendar/lib/css/react-big-calendar.css'
 import './History.css'
 
 const locales = { 'en-US': enUS }
-const localizer = dateFnsLocalizer({ format, parse, startOfWeek, getDay, locales })
+
+const formatWithShortWeekday = (date: Date, formatStr: string, locale?: { locale?: Locale }) => {
+  const resolvedLocale = locale?.locale ?? enUS
+  // react-big-calendar renders full weekday names (e.g. "Tuesday") via the
+  // 'cccc' token in day headers; collapse those to the 3-letter form so
+  // headers read "Tue" instead of "Tuesday".
+  const shortFormat = formatStr.replace(/cccc/g, 'ccc')
+  return format(date, shortFormat, { locale: resolvedLocale })
+}
+
+const localizer = dateFnsLocalizer({ format: formatWithShortWeekday, parse, startOfWeek, getDay, locales })
 
 interface CalendarEvent {
   title: string
