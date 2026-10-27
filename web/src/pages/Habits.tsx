@@ -48,15 +48,6 @@ export default function Habits() {
     <div className="habits-page container-lg py-4">
       <div className="mb-4">
         <h1 className="h3 mb-0">Habits</h1>
-        <button
-          className="fab"
-          type="button"
-          onClick={() => { setEditingHabit(null); setWizardOpen(true) }}
-          aria-label="Add habit"
-          data-testid="add-habit-btn"
-        >
-          <Plus size={34} />
-        </button>
       </div>
 
       {habits.length === 0 ? (
@@ -104,7 +95,7 @@ export default function Habits() {
         aria-label="Add habit"
         data-testid="add-habit-fab"
       >
-        +
+        <Plus size={34} />
       </button>
       <HabitWizard
         open={wizardOpen}
