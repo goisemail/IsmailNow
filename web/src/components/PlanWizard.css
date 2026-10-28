@@ -197,18 +197,19 @@
     padding: 20px 16px;
   }
 
-  .plan-wizard-time-row {
+  /* .plan-wizard-time-row {
     flex-direction: column;
   }
 
   .plan-wizard-time-row .task-wizard-input {
     flex: none;
     width: 90%;
-    height: 40px;
-  }
+    height: 20px;
+  } */
+   
   .task-wizard-input {
     flex: none;
     width: 90%;
-    height: 40px;
+    height: 20px;
   }
 }
