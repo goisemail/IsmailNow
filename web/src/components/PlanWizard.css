@@ -1,7 +1,12 @@
 .plan-wizard-time-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.plan-wizard-time-row .task-wizard-input {
+  min-width: 0;
+  flex: 1;
 }
 
 .plan-wizard-checkbox {
@@ -179,5 +184,25 @@
 
   .plan-wizard-label {
     font-size: 0.875rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .task-wizard-overlay {
+    padding: 10px;
+  }
+
+  .task-wizard-card {
+    max-width: 100%;
+    padding: 20px 16px;
+  }
+
+  .plan-wizard-time-row {
+    flex-direction: column;
+  }
+
+  .plan-wizard-time-row .task-wizard-input {
+    flex: none;
+    width: 100%;
   }
 }
