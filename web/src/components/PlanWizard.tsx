@@ -6,7 +6,6 @@ import type { PendingPlan } from '../store/plans'
 import { useTasksStore } from '../store/tasks'
 import { planOccurrenceDates } from '../utils/planner'
 import HabitWizard from './HabitWizard'
-import './TaskWizard.css'
 import './PlanWizard.css'
 
 interface PlanWizardProps {
