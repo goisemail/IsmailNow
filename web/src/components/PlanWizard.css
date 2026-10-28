@@ -203,10 +203,10 @@
 
   .plan-wizard-time-row .task-wizard-input {
     flex: none;
-    width: 80%;
+    width: 90%;
   }
   .task-wizard-input {
     flex: none;
-    width: 80%;
+    width: 90%;
   }
 }
