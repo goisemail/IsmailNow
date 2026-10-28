@@ -189,12 +189,14 @@ export default function PlanWizard({
         <h2 className="task-wizard-title" id="plan-wizard-title">Plan your time</h2>
 
         <form onSubmit={handlePlanSubmit}>
+
+          <div>
           <label className="task-wizard-label" htmlFor="plan-wizard-title-input">
             Planner name
           </label>
           <input
             id="plan-wizard-title-input"
-            ref={inputRef}
+            //ref={inputRef}
             type="text"
             className="task-wizard-input"
             placeholder="e.g. Morning workout"
@@ -205,7 +207,9 @@ export default function PlanWizard({
           {showErrors && !titleValid && (
             <p className="plan-wizard-error">Give the plan a name.</p>
           )}
+          </div>
 
+          <div>
           <label className="task-wizard-label" htmlFor="plan-wizard-day">
             Day
           </label>
@@ -217,38 +221,39 @@ export default function PlanWizard({
             onChange={(event) => setDay(event.target.value)}
             data-testid="planWizardDay"
           />
-
-          <div className="plan-wizard-time-row">
-            <div>
-              <label className="task-wizard-label" htmlFor="plan-wizard-start">
-                Start time
-              </label>
-              <input
-                id="plan-wizard-start"
-                type="time"
-                className="task-wizard-input"
-                value={startTime}
-                onChange={(event) => setStartTime(event.target.value)}
-                data-testid="planWizardStart"
-              />
-            </div>
-            <div>
-              <label className="task-wizard-label" htmlFor="plan-wizard-end">
-                End time
-              </label>
-              <input
-                id="plan-wizard-end"
-                type="time"
-                className="task-wizard-input"
-                value={endTime}
-                onChange={(event) => setEndTime(event.target.value)}
-                data-testid="planWizardEnd"
-              />
-            </div>
           </div>
-          {showErrors && !timesValid && (
+
+          <div>
+            <label className="task-wizard-label" htmlFor="plan-wizard-start">
+              Start time
+            </label>
+            <input
+              id="plan-wizard-start"
+              type="time"
+              className="task-wizard-input"
+              value={startTime}
+              onChange={(event) => setStartTime(event.target.value)}
+              data-testid="planWizardStart"
+            />
+          </div>
+
+          <div>
+            <label className="task-wizard-label" htmlFor="plan-wizard-end">
+              End time
+            </label>
+            <input
+              id="plan-wizard-end"
+              type="time"
+              className="task-wizard-input"
+              value={endTime}
+              onChange={(event) => setEndTime(event.target.value)}
+              data-testid="planWizardEnd"
+            />
+            {showErrors && !timesValid && (
             <p className="plan-wizard-error">End time must be after the start time.</p>
-          )}
+              )}
+          </div>
+
 
           <label className="plan-wizard-checkbox">
             <input
