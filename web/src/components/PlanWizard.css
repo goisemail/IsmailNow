@@ -88,6 +88,12 @@
 }
 
 @media (prefers-color-scheme: dark) {
+    .task-wizard-input {
+    flex: none;
+    width: 90%;
+    height: 20%;
+  }
+  
   .plan-wizard-hint {
     color: #868e96;
   }
@@ -161,6 +167,12 @@
   .plan-delete-btn:hover {
     background: #c82333;
   }
+
+  .task-wizard-input {
+    flex: none;
+    width: 90%;
+    height: 20%;
+  }
 }
 
 .planner-time-row input[type="date"],
@@ -185,6 +197,12 @@
   .plan-wizard-label {
     font-size: 0.875rem;
   }
+  
+  .task-wizard-input {
+    flex: none;
+    width: 90%;
+    height: 20%;
+  }
 }
 
 @media (max-width: 480px) {
@@ -197,19 +215,10 @@
     padding: 20px 16px;
   }
 
-  /* .plan-wizard-time-row {
-    flex-direction: column;
-  }
-
-  .plan-wizard-time-row .task-wizard-input {
-    flex: none;
-    width: 90%;
-    height: 20px;
-  } */
    
   .task-wizard-input {
     flex: none;
     width: 90%;
-    height: 20px;
+    height: 20%;
   }
 }
