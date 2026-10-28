@@ -96,7 +96,7 @@ export default function PlanWizard({
   const titleValid = title.trim().length > 0
   const timesValid = Boolean(startTime) && Boolean(endTime) && endTime > startTime
   const repeatValid = !isRepeating || (repeatEndDate !== '' && repeatEndDate >= day)
-  const formValid = titleValid && timesValid && repeatValid
+  const formValid = titleValid && timesValid && repeatValid && !(addAsTask && addAsHabit)
 
   const resetAndClose = () => {
     setPhase('plan')
@@ -145,10 +145,12 @@ export default function PlanWizard({
         taskIds.push(await useTasksStore.getState().addTask(planTitle, occurrenceDate))
       }
       usePlansStore.getState().updatePlan(newPlanId, { linkedTaskIds: taskIds })
+      resetAndClose()
+    } else if (addAsHabit) {
+      setPhase('habit')
+    } else {
+      resetAndClose()
     }
-
-    if (addAsHabit) setPhase('habit')
-    else resetAndClose()
   }
 
   const handleHabitSaved = (draft: HabitDraft) => {
@@ -300,7 +302,7 @@ export default function PlanWizard({
               <input
                 type="checkbox"
                 checked={addAsTask}
-                onChange={(event) => setAddAsTask(event.target.checked)}
+                onChange={(event) => { setAddAsTask(event.target.checked); setAddAsHabit(false) }}
                 data-testid="planWizardAddTask"
               />
               Also add as Task
@@ -309,7 +311,7 @@ export default function PlanWizard({
               <input
                 type="checkbox"
                 checked={addAsHabit}
-                onChange={(event) => setAddAsHabit(event.target.checked)}
+                onChange={(event) => { setAddAsHabit(event.target.checked); setAddAsTask(false) }}
                 data-testid="planWizardAddHabit"
               />
               Also add as Habit

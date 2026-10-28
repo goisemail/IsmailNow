@@ -132,23 +132,6 @@ describe('PlanWizard', () => {
     )
   })
 
-  it('keeps the plan and task when the chained habit wizard is cancelled', async () => {
-    render(<PlanWizard open onClose={vi.fn()} defaultDate="2026-10-15" />)
-
-    await userEvent.type(screen.getByTestId('planWizardName'), 'Evening block')
-    await userEvent.click(screen.getByTestId('planWizardAddTask'))
-    await userEvent.click(screen.getByTestId('planWizardAddHabit'))
-    await userEvent.click(screen.getByTestId('planWizardSave'))
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
-
-    await waitFor(() => expect(screen.queryByTestId('habitWizardInput')).not.toBeInTheDocument())
-    expect(usePlansStore.getState().plans).toHaveLength(1)
-    expect(useTasksStore.getState().tasks).toHaveLength(1)
-    expect(useHabitsStore.getState().habits).toHaveLength(0)
-    expect(usePlansStore.getState().plans[0].linkedHabitId).toBeNull()
-  })
-
   it('chains into the habit wizard and links the created habit', async () => {
     render(<PlanWizard open onClose={vi.fn()} defaultDate="2026-10-15" />)
 
@@ -168,17 +151,59 @@ describe('PlanWizard', () => {
     expect(useHabitsStore.getState().habits.map((habit) => habit.id)).toContain(linkedHabitId)
   })
 
-  it('creates the task instantly and opens only the habit wizard when both are ticked', async () => {
+  it('unchecks task when habit is checked', async () => {
+    render(<PlanWizard open onClose={vi.fn()} defaultDate="2026-10-15" />)
+
+    await userEvent.click(screen.getByTestId('planWizardAddTask'))
+    await userEvent.click(screen.getByTestId('planWizardAddHabit'))
+
+    expect(screen.getByTestId('planWizardAddTask')).not.toBeChecked()
+    expect(screen.getByTestId('planWizardAddHabit')).toBeChecked()
+  })
+
+  it('unchecks habit when task is checked', async () => {
+    render(<PlanWizard open onClose={vi.fn()} defaultDate="2026-10-15" />)
+
+    await userEvent.click(screen.getByTestId('planWizardAddHabit'))
+    await userEvent.click(screen.getByTestId('planWizardAddTask'))
+
+    expect(screen.getByTestId('planWizardAddHabit')).not.toBeChecked()
+    expect(screen.getByTestId('planWizardAddTask')).toBeChecked()
+  })
+
+  it('saves a task-only plan without opening the habit wizard', async () => {
+    const onClose = vi.fn()
+    render(<PlanWizard open onClose={onClose} defaultDate="2026-10-15" />)
+
+    await userEvent.type(screen.getByTestId('planWizardName'), 'Gym session')
+    await userEvent.click(screen.getByTestId('planWizardAddTask'))
+    await userEvent.click(screen.getByTestId('planWizardSave'))
+
+    await waitFor(() => expect(onClose).toHaveBeenCalled())
+    const plans = usePlansStore.getState().plans
+    const tasks = useTasksStore.getState().tasks
+    expect(plans).toHaveLength(1)
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0]).toMatchObject({ title: 'Gym session', startDate: '2026-10-15' })
+    expect(plans[0].linkedTaskIds).toEqual([tasks[0].id])
+    expect(plans[0].linkedHabitId).toBeNull()
+    expect(screen.queryByTestId('habitWizardInput')).not.toBeInTheDocument()
+  })
+
+  it('keeps the plan when the chained habit wizard is cancelled', async () => {
     render(<PlanWizard open onClose={vi.fn()} defaultDate="2026-10-15" />)
 
     await userEvent.type(screen.getByTestId('planWizardName'), 'Evening block')
-    await userEvent.click(screen.getByTestId('planWizardAddTask'))
     await userEvent.click(screen.getByTestId('planWizardAddHabit'))
     await userEvent.click(screen.getByTestId('planWizardSave'))
 
-    expect(await screen.findByTestId('habitWizardInput')).toBeInTheDocument()
-    expect(useTasksStore.getState().tasks.map((task) => task.title)).toEqual(['Evening block'])
-    expect(screen.queryByTestId('taskWizardInput')).not.toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
+
+    await waitFor(() => expect(screen.queryByTestId('habitWizardInput')).not.toBeInTheDocument())
+    expect(usePlansStore.getState().plans).toHaveLength(1)
+    expect(useTasksStore.getState().tasks).toHaveLength(0)
+    expect(useHabitsStore.getState().habits).toHaveLength(0)
+    expect(usePlansStore.getState().plans[0].linkedHabitId).toBeNull()
   })
 
   it('prefills the wizard from an existing plan', async () => {
